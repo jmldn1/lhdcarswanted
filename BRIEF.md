@@ -56,12 +56,13 @@ site. Started 18 November 2026.
 5. **Hosting:** the same VPS as London LHD Centre (its own PM2 app, nginx
    site and database) or somewhere else. The VPS's Node version must be
    22.23.4 or newer for Astro 7.
-6. **GitHub:** a new repository for this project (name and account), created
-   when you say.
+6. **GitHub:** *done 18 Nov 2026:* https://github.com/jmldn1/lhdcarswanted
+   (`main`).
 
 ## First steps (once the decisions above allow)
 
-1. Commit this starting point and connect the new GitHub repository.
+1. ~~Commit this starting point and connect the new GitHub repository.~~
+   Done 18 Nov 2026.
 2. Test stock: a few cars with photos the client is happy to use in
    development (not London LHD Centre's), through the photo pipeline.
 3. The brand look, then the homepage (the v2 homepage mockups are a
