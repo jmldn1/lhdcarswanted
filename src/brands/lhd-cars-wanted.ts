@@ -2,8 +2,9 @@ import type { Brand } from "./types.ts";
 
 // LHD Cars Wanted. Everything in [BRACKETS] is a placeholder until the client
 // confirms it: the live site (Nov 2026) still shows a sample phone number, so
-// nothing is copied from it without checking. The look (colours, fonts, logo)
-// hasn't been chosen yet; these neutral values only keep pages readable.
+// nothing is copied from it without checking. The look follows the v2
+// mockups (fonts, layout); its own colours and logo are still to be chosen,
+// so the colours below are neutral placeholders.
 export const lhdCarsWanted: Brand = {
   id: "lhd-cars-wanted",
   name: "LHD Cars Wanted",
@@ -20,10 +21,9 @@ export const lhdCarsWanted: Brand = {
     },
   },
   fonts: {
-    // System fonts until a look is chosen. Font files and preloads:
-    // src/brands/fonts/lhd-cars-wanted.ts
-    display: '"Arial Narrow", Arial, sans-serif',
-    body: 'system-ui, "Segoe UI", sans-serif',
+    // Font files and preloads: src/brands/fonts/lhd-cars-wanted.ts
+    display: '"Barlow Condensed", "Arial Narrow", Arial, sans-serif',
+    body: '"Source Sans 3", "Segoe UI", system-ui, sans-serif',
   },
   contact: {
     phones: [{ label: "Sales", display: "[PHONE]", tel: "" }],

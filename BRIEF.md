@@ -43,8 +43,14 @@ site. Started 18 November 2026.
 
 ## Decisions to make
 
-1. **Look:** colours, fonts and logo for LHD Cars Wanted. The brand file
-   holds neutral placeholders.
+1. **Look:** *decided 18 Nov 2026:* carry over the v2 mockups
+   (https://claude.ai/artifact/43KP51TV75miubnihbbhW5): Barlow Condensed and
+   Source Sans 3, square corners, thin borders, lots of white space, whole car
+   photos. The homepage starts from concept C as last changed: a short
+   full-width hero cropped only top and bottom, the text kept in the hero on
+   phones too, a featured car bar, then makes, cars, the sell band, services
+   and the showroom. **Still open:** LHD Cars Wanted's own colours and logo
+   (the mockups use London LHD Centre's steel blue and wordmark).
 2. **Facts:** the real phone and WhatsApp numbers, address, opening hours,
    and which claims (finance, warranty, reservations, part exchange,
    inspections) are true.
@@ -65,8 +71,7 @@ site. Started 18 November 2026.
    Done 18 Nov 2026.
 2. Test stock: a few cars with photos the client is happy to use in
    development (not London LHD Centre's), through the photo pipeline.
-3. The brand look, then the homepage (the v2 homepage mockups are a
-   starting point: https://claude.ai/artifact/43KP51TV75miubnihbbhW5).
+3. Colours and logo, then the homepage from mockup C (see decision 1).
 4. MongoDB stock with this site's own database, and the admin for adding cars
    with photos encoded in the background.
 5. Sell your car / valuation form, then the remaining pages, then redirects

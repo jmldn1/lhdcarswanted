@@ -1,4 +1,9 @@
-// LHD Cars Wanted uses system fonts until its look is chosen: nothing to load.
-// When it gets its own fonts, import their CSS here and list the files the top
-// of a page needs (see src/brands/fonts/demo.ts for the shape).
-export const preload: string[] = [];
+// LHD Cars Wanted's fonts (the v2 mockups' pair): the @font-face rules, and
+// the files the top of a page needs straight away (headings, model names,
+// body text), preloaded so text doesn't swap fonts and shift the layout.
+import "./lhd-cars-wanted.css";
+import barlow700 from "@fontsource/barlow-condensed/files/barlow-condensed-latin-700-normal.woff2?url";
+import barlow600 from "@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2?url";
+import sans400 from "@fontsource/source-sans-3/files/source-sans-3-latin-400-normal.woff2?url";
+
+export const preload: string[] = [barlow700, barlow600, sans400];
