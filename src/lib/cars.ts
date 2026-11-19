@@ -39,13 +39,14 @@ export async function getCar(slug: string): Promise<Car | undefined> {
   return (await listCars()).find((c) => c.slug === slug);
 }
 
+/** Title case, but short words already in capitals stay so ("GP White"). */
+export const nice = (s: string) =>
+  s.length <= 3
+    ? s.toUpperCase()
+    : s.replace(/\S+/g, (w) => (w.length <= 3 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()));
+
 /** "2018 · 51,700 miles · Silver · reg. Czech Republic" */
 export function specsLine(c: Car): string {
-  // Title case, but short words already in capitals stay so ("GP White").
-  const nice = (s: string) =>
-    s.length <= 3
-      ? s.toUpperCase()
-      : s.replace(/\S+/g, (w) => (w.length <= 3 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()));
   return [c.year, c.mileage, c.colour && nice(c.colour), c.registered && `reg. ${nice(c.registered)}`]
     .filter(Boolean)
     .join(" · ");
