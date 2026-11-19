@@ -9,7 +9,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "start": "node ./dist/server/entry.mjs",
-    "check": "astro check"
+    "check": "astro check",
+    "stock:import-mercury": "node scripts/import-mercury-stock.ts"
   },
   "dependencies": {
     "@astrojs/node": "11.1.12",
@@ -17,6 +18,7 @@
     "@fontsource/source-sans-3": "5.3.1",
     "@tailwindcss/vite": "4.3.5",
     "astro": "7.4.10",
+    "lightgallery": "^2.9.0",
     "sharp": "0.35.5",
     "tailwindcss": "4.3.5"
   },

@@ -8,14 +8,23 @@ v2 code (`C:\Users\lhdca\Projects\londonlhd-v2`); see `BRIEF.md`.
 
 ```sh
 npm install
-npm run dev            # http://localhost:4321/cars
+npm run dev            # http://localhost:4321/
 BRAND=demo npm run dev # the made-up brand, to check nothing is hard-coded
 npm run check          # type check
 npm run build && npm start
 ```
 
-There's no stock yet, so /cars shows the empty message until test stock is
-added (see `BRIEF.md`, first steps).
+Test stock comes from the old site's code (the private "mercury" repository).
+Clone it anywhere outside this project, then:
+
+```sh
+npm run stock:import-mercury -- <mercury>/public/images
+```
+
+**Windows:** start the dev server from a path with a capital drive letter
+(`C:\Users\...`, not `c:\Users\...`). Otherwise Astro hashes the two
+spellings differently and every component's scoped styles silently stop
+applying in dev. The production build isn't affected.
 
 ## Where things are
 
@@ -28,7 +37,14 @@ added (see `BRIEF.md`, first steps).
   JPG fallback. Framing happens on the page only.
 - `src/lib/cars.ts`: stock. Reads `data/cars.json` for now; MongoDB (this
   site's own database) comes next with the same functions.
-- `src/pages/cars/`: /cars (grid and quick look) and the car page.
+- `src/lib/site.ts`: the homepage's featured car, hero photo and sell band
+  photo (`data/site.json`).
+- `src/pages/index.astro`: the homepage (v2 mockup concept C).
+- `src/pages/sell-your-car.astro`: the sell form (from the sell page mockup), saving
+  through `src/lib/leads.ts`. Works without JavaScript. Its words are in the
+  brand file (`copy.sell`).
+- `src/pages/cars/`: /cars (grid, quick look, `?make=` filter) and the car page.
+- `scripts/import-mercury-stock.ts`: test stock from mercury's photos.
 
 `data/` and `public/photos/` hold test stock and are git-ignored.
 
@@ -40,3 +56,4 @@ added (see `BRIEF.md`, first steps).
 | `PHOTO_DIR` | `public/photos` | Where photos are written (served by nginx in production) |
 | `PHOTO_URL` | `/photos` | URL the photo folder is served from |
 | `DATA_DIR` | `data` | Test stock file location |
+| `LEADS_DIR` | `data/leads` | Where sell your car requests (and their photos) are saved. Customer data: outside the app folder in production, never in git |

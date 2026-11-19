@@ -1,0 +1,783 @@
+---
+// Sell your car (the old site's URL, kept). From the sell page mockup
+// (claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv), which takes the Form
+// System's simple form into the site's look: one page, labels above plain
+// fields, pill choices, photos, an optional message, one button.
+//
+// Works without JavaScript: the form posts to this page, which saves the
+// request and redirects to the thank-you message (so a refresh can't send
+// it twice). Words come from the brand (copy.sell).
+import Base from "../layouts/Base.astro";
+import CarPhoto from "../components/CarPhoto.astro";
+import { brand } from "../brands/index.ts";
+import { listCars } from "../lib/cars.ts";
+import { readSellForm, saveSellRequest, MAX_PHOTOS, DIAL_CODES, type SellRequest, type SellErrors } from "../lib/leads.ts";
+
+const copy = brand.copy.sell;
+if (!brand.features.sellForm || !copy) return new Response(null, { status: 404 });
+
+let values: Partial<SellRequest> = { unit: "miles", registered: "UK", drive: "Left hand drive", dial: "+44" };
+let errors: SellErrors = {};
+let failed = false;
+
+if (Astro.request.method === "POST") {
+  const size = Number(Astro.request.headers.get("content-length") ?? 0);
+  if (size > (MAX_PHOTOS + 1) * 15 * 1024 * 1024) {
+    errors = { photos: "That's too much to send at once. Try fewer photos, or send them on WhatsApp." };
+  } else {
+    const form = await Astro.request.formData();
+    // Left empty by people; filled by bots. Bots get the thank-you anyway.
+    if (String(form.get("website") ?? "")) return Astro.redirect("/sell-your-car?sent=1", 303);
+    const read = readSellForm(form);
+    values = read.data;
+    errors = read.errors;
+    if (!Object.keys(errors).length) {
+      try {
+        await saveSellRequest(read.data, read.photos);
+        return Astro.redirect("/sell-your-car?sent=1", 303);
+      } catch {
+        failed = true;
+      }
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const sent = Astro.url.searchParams.get("sent") === "1";
+const hasErrors = Object.keys(errors).length > 0;
+
+const sales = brand.contact.phones[0];
+const whatsapp = brand.contact.whatsapp ? `https://wa.me/${brand.contact.whatsapp}` : "";
+
+// The side photo: the featured car's cover for now.
+const cars = await listCars();
+const sidePhoto = cars.find((c) => c.status !== "sold" && c.photos.length)?.photos[0];
+
+const MAKES = [
+  "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Citroën", "Ferrari", "Fiat", "Ford", "Jaguar",
+  "Lamborghini", "Land Rover", "Lexus", "Maserati", "McLaren", "Mercedes-Benz", "MINI", "Peugeot", "Porsche",
+  "Renault", "Rolls-Royce", "Toyota", "Volkswagen", "Volvo",
+];
+const choices = {
+  registered: ["UK", "Europe", "Elsewhere"],
+  drive: ["Left hand drive", "Right hand drive"],
+} as const;
+---
+
+<Base title="Sell your car" description={copy.intro}>
+  <main class="wrap page">
+    <div class="layout">
+      {sent ? (
+        <section class="card done" aria-live="polite">
+          <span class="done-icon" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          </span>
+          <h1>Thanks, we've got your car's details</h1>
+          <p class="intro">{copy.thanks}</p>
+          <p>Photos help us give you a firmer price. Send them whenever you're ready:</p>
+          <div class="quick">
+            {whatsapp
+              ? <a class="dark" href={whatsapp}>Send photos on WhatsApp</a>
+              : <span class="dark" aria-disabled="true">WhatsApp [NUMBER]</span>}
+            <a class="ghost" href="/cars">See the cars for sale</a>
+          </div>
+        </section>
+      ) : (
+        <form class="card" method="post" enctype="multipart/form-data" novalidate>
+          <div class="head">
+            <p class="trust">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+              {copy.trust}
+            </p>
+            <h1>Sell your car</h1>
+            <p class="intro">{copy.intro}</p>
+          </div>
+
+          {hasErrors && (
+            <p class="alert" role="alert">Please check the {Object.keys(errors).length === 1 ? "field" : "fields"} marked below.</p>
+          )}
+          {failed && (
+            <p class="alert" role="alert">
+              Sorry, that didn't send. Please try again{sales?.tel && <>, or call <a href={`tel:${sales.tel}`}>{sales.display}</a></>}.
+            </p>
+          )}
+
+          <div class="quick">
+            {whatsapp ? (
+              <a class="dark" href={whatsapp}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z" /></svg>
+                Send photos on WhatsApp
+              </a>
+            ) : (
+              <span class="dark" aria-disabled="true">WhatsApp [NUMBER]</span>
+            )}
+            {sales && (sales.tel
+              ? <a class="ghost" href={`tel:${sales.tel}`}>Call {sales.display}</a>
+              : <span class="ghost" aria-disabled="true">Call {sales.display}</span>)}
+          </div>
+
+          <p class="or"><span>Or tell us about your car</span></p>
+
+          <div>
+            <label class="lbl" for="reg">Registration or VIN <span class="opt">(optional)</span></label>
+            <input id="reg" name="reg" class="in plate" value={values.reg} placeholder="AB12 CDE" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+            <p class="hint">Foreign plates, or none yet? Enter the VIN, or leave it blank.</p>
+          </div>
+
+          <div class="two">
+            <div>
+              <label class="lbl" for="make">Make</label>
+              <input id="make" name="make" class="in" list="makes" value={values.make} placeholder="e.g. Porsche" autocomplete="off" required aria-invalid={errors.make ? "true" : undefined} aria-describedby={errors.make ? "make-err" : undefined} />
+              <datalist id="makes">{MAKES.map((m) => <option value={m} />)}</datalist>
+              {errors.make && <p class="err" id="make-err">{errors.make}</p>}
+            </div>
+            <div>
+              <label class="lbl" for="model">Model</label>
+              <input id="model" name="model" class="in" value={values.model} placeholder="e.g. 911 Carrera" required aria-invalid={errors.model ? "true" : undefined} aria-describedby={errors.model ? "model-err" : undefined} />
+              {errors.model && <p class="err" id="model-err">{errors.model}</p>}
+            </div>
+          </div>
+
+          <div class="two">
+            <div>
+              <label class="lbl" for="year">Year</label>
+              <input id="year" name="year" class="in" value={values.year} inputmode="numeric" maxlength="4" placeholder="e.g. 2015" aria-invalid={errors.year ? "true" : undefined} aria-describedby={errors.year ? "year-err" : undefined} />
+              {errors.year && <p class="err" id="year-err">{errors.year}</p>}
+            </div>
+            <div>
+              <label class="lbl" for="mileage">Mileage</label>
+              <div class="joined">
+                <input id="mileage" name="mileage" class="in" value={values.mileage} inputmode="numeric" placeholder="e.g. 42,000" aria-invalid={errors.mileage ? "true" : undefined} aria-describedby={errors.mileage ? "mileage-err" : undefined} />
+                <fieldset class="units">
+                  <legend class="sr">Mileage in</legend>
+                  {(["miles", "km"] as const).map((u) => (
+                    <label><input class="sr" type="radio" name="unit" value={u} checked={values.unit === u} /><span>{u}</span></label>
+                  ))}
+                </fieldset>
+              </div>
+              {errors.mileage && <p class="err" id="mileage-err">{errors.mileage}</p>}
+            </div>
+          </div>
+
+          <fieldset class="choice">
+            <legend class="lbl">Where is it registered?</legend>
+            <div class="pills">
+              {choices.registered.map((c) => (
+                <label class="pill"><input class="sr" type="radio" name="registered" value={c} checked={values.registered === c} /><span>{c}</span></label>
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset class="choice">
+            <legend class="lbl">Which side is the steering wheel?</legend>
+            <div class="pills">
+              {choices.drive.map((c) => (
+                <label class="pill"><input class="sr" type="radio" name="drive" value={c} checked={values.drive === c} /><span>{c}</span></label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <span class="lbl" id="photos-lbl">Photos <span class="opt">(optional, they help us price it)</span></span>
+            <label class="drop">
+              <span class="drop-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" /><circle cx="12" cy="13" r="4" /></svg>
+              </span>
+              <span>
+                <strong data-photo-count>Add photos</strong>
+                <span class="hint">Outside, inside and the dashboard, up to {MAX_PHOTOS}. Or send them on WhatsApp later.</span>
+              </span>
+              <input class="sr" type="file" name="photos" accept="image/*" multiple aria-labelledby="photos-lbl" aria-invalid={errors.photos ? "true" : undefined} aria-describedby={errors.photos ? "photos-err" : undefined} />
+            </label>
+            {errors.photos && <p class="err" id="photos-err">{errors.photos}</p>}
+          </div>
+
+          <hr />
+
+          <div>
+            <label class="lbl" for="name">Your name</label>
+            <input id="name" name="name" class="in" value={values.name} placeholder="First and last name" autocomplete="name" required aria-invalid={errors.name ? "true" : undefined} aria-describedby={errors.name ? "name-err" : undefined} />
+            {errors.name && <p class="err" id="name-err">{errors.name}</p>}
+          </div>
+
+          <div class="two">
+            <div>
+              <label class="lbl" for="email">Email</label>
+              <input id="email" name="email" type="email" class="in" value={values.email} placeholder="you@example.com" autocomplete="email" required aria-invalid={errors.email ? "true" : undefined} aria-describedby={errors.email ? "email-err" : undefined} />
+              {errors.email && <p class="err" id="email-err">{errors.email}</p>}
+            </div>
+            <div>
+              <label class="lbl" for="phone">Phone <span class="opt">(optional)</span></label>
+              <div class="joined">
+                <select name="dial" class="dial" aria-label="Country code" autocomplete="tel-country-code">
+                  {DIAL_CODES.map(([code]) => (
+                    <option value={code} selected={values.dial === code}>{code}</option>
+                  ))}
+                </select>
+                <input id="phone" name="phone" type="tel" class="in" value={values.phone} placeholder="07400 123456" autocomplete="tel-national" aria-invalid={errors.phone ? "true" : undefined} aria-describedby={errors.phone ? "phone-err" : undefined} />
+              </div>
+              {errors.phone && <p class="err" id="phone-err">{errors.phone}</p>}
+            </div>
+          </div>
+
+          <details class="msg" open={values.message ? true : undefined}>
+            <summary>+ Add a message (optional)</summary>
+            <label class="lbl" for="message">Anything we should know?</label>
+            <textarea id="message" name="message" class="in" rows="3" placeholder="Condition, service history, where the car is now…">{values.message}</textarea>
+          </details>
+
+          <div class="bot" aria-hidden="true">
+            <label>Leave this empty <input name="website" tabindex="-1" autocomplete="off" /></label>
+          </div>
+
+          <div class="send">
+            <ul class="ticks">
+              {copy.promises.map((p) => (
+                <li>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+                  {p}
+                </li>
+              ))}
+            </ul>
+            <button class="go" type="submit">
+              Get a price for my car
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </button>
+            <p class="small">Takes about a minute · <a href="/privacy">Privacy policy</a></p>
+          </div>
+        </form>
+      )}
+
+      <aside class="side">
+        <div class="card side-card">
+          {sidePhoto && (
+            <div class="side-photo">
+              <CarPhoto photo={sidePhoto} fit="cover" sizes="400px" alt="" />
+            </div>
+          )}
+          <div class="side-in">
+            <h2>What happens next</h2>
+            <ol class="steps">
+              {copy.steps.map((s, i) => (
+                <li>
+                  <span class="n" aria-hidden="true">{i + 1}</span>
+                  <span><strong>{s.title}</strong><br /><span class="muted">{s.text}</span></span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+        <div class="card side-in talk">
+          <h2>Rather talk?</h2>
+          <p class="muted">{brand.contact.hours}</p>
+          {sales && (sales.tel ? <a class="big" href={`tel:${sales.tel}`}>{sales.display}</a> : <span class="big">{sales.display}</span>)}
+          <a href={`mailto:${brand.contact.email}`}>{brand.contact.email}</a>
+        </div>
+      </aside>
+    </div>
+  </main>
+</Base>
+
+<script>
+  // With scripts on: show how many photos were picked.
+  const input = document.querySelector<HTMLInputElement>('input[name="photos"]');
+  const label = document.querySelector("[data-photo-count]");
+  input?.addEventListener("change", () => {
+    const n = input.files?.length ?? 0;
+    if (label) label.textContent = n ? `${n} photo${n === 1 ? "" : "s"} added` : "Add photos";
+  });
+</script>
+
+<style>
+  .page {
+    padding-block: 40px 8px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 40px;
+    align-items: start;
+  }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  form.card,
+  .done {
+    padding: 40px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .head {
+    display: grid;
+    gap: 10px;
+  }
+  .trust {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+  h1 {
+    font-size: clamp(34px, 4vw, 46px);
+    line-height: 1;
+    font-weight: 700;
+    margin: 0;
+  }
+  .intro {
+    margin: 0;
+    font-size: 17px;
+    color: var(--color-muted);
+  }
+  .alert {
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--color-fg);
+    background: var(--color-picked);
+    font-weight: 600;
+  }
+
+  .quick {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dark,
+  .ghost {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    padding-inline: 12px;
+    text-align: center;
+  }
+  .dark {
+    background: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .ghost {
+    border: 1.5px solid var(--color-fg);
+    color: var(--color-fg);
+  }
+  .or {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .or::before,
+  .or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--color-line);
+  }
+
+  /* Fields: labels above, plain boxes. Borders strong enough to see (3:1). */
+  .two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .lbl {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    padding: 0;
+  }
+  .opt,
+  .muted {
+    font-weight: 400;
+    color: var(--color-muted);
+  }
+  .in {
+    --field-line: color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    height: 52px;
+    border: 1px solid var(--field-line);
+    border-radius: 0;
+    background: var(--color-surface);
+    color: var(--color-fg);
+    padding: 0 14px;
+    font: inherit;
+    font-size: 16px;
+  }
+  .in::placeholder {
+    color: var(--color-muted);
+  }
+  .in:focus {
+    outline: none;
+    border-color: var(--color-fg);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+  .in[aria-invalid="true"] {
+    border: 2px solid var(--color-fg);
+  }
+  textarea.in {
+    height: auto;
+    padding: 12px 14px;
+    resize: vertical;
+  }
+  /* The registration as a number plate: a UK rear plate's colours, in both themes. */
+  .plate {
+    height: 60px;
+    max-width: 320px;
+    background: #fff4c2;
+    color: #16181d;
+    border: 2px solid #16181d;
+    font: 700 26px/1 var(--font-display);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .plate::placeholder {
+    color: #6b6650;
+  }
+  .hint {
+    display: block;
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .err {
+    margin: 6px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .err::before {
+    content: "! ";
+  }
+
+  .joined {
+    display: flex;
+    border: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+  }
+  .joined:focus-within {
+    border-color: var(--color-fg);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+  .joined .in {
+    border: 0;
+    min-width: 0;
+    height: 50px;
+    box-shadow: none;
+  }
+  /* The country code: a grey box joined to the number, as in the Form System. */
+  .dial {
+    flex: none;
+    width: 76px;
+    border: 0;
+    border-right: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+    background: var(--color-bg)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235d6470'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z'/%3E%3C/svg%3E")
+      no-repeat right 6px center / 14px;
+    appearance: none;
+    padding: 0 20px 0 12px;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg);
+    cursor: pointer;
+  }
+  .dial:focus {
+    outline: none;
+  }
+  .units {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-left: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+  }
+  .units label {
+    display: flex;
+    cursor: pointer;
+  }
+  .units span {
+    display: grid;
+    place-items: center;
+    min-width: 52px;
+    padding: 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+  .units input:checked + span {
+    background: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .units input:focus-visible + span,
+  .pill input:focus-visible + span {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .choice {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    cursor: pointer;
+  }
+  .pill span {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+    background: var(--color-surface);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .pill input:checked + span {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-surface);
+  }
+
+  .drop {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1.5px dashed color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+    background: var(--color-bg);
+    padding: 16px;
+    cursor: pointer;
+  }
+  .drop:hover,
+  .drop:focus-within {
+    border-color: var(--color-fg);
+  }
+  .drop:focus-within {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .drop strong {
+    display: block;
+    font-size: 15px;
+  }
+  .drop .hint {
+    margin: 0;
+  }
+  .drop-icon {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: var(--color-picked);
+    color: var(--color-accent);
+  }
+
+  hr {
+    border: 0;
+    height: 1px;
+    background: var(--color-line);
+    margin: 0;
+  }
+
+  .msg summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .msg summary::-webkit-details-marker {
+    display: none;
+  }
+  .msg[open] summary {
+    display: none;
+  }
+
+  /* The honeypot: off screen for people, still in the form for bots. */
+  .bot {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .send {
+    display: grid;
+    gap: 12px;
+  }
+  .ticks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+    font-size: 15px;
+  }
+  .ticks li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .ticks svg {
+    flex: none;
+    margin-top: 4px;
+    color: var(--color-accent);
+  }
+  .go {
+    width: 100%;
+    min-height: 56px;
+    border: 0;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .go:hover {
+    filter: brightness(0.92);
+  }
+  .small {
+    margin: 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .small a {
+    color: inherit;
+  }
+
+  .done-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--color-picked);
+    color: var(--color-accent);
+    display: grid;
+    place-items: center;
+  }
+  .done p {
+    margin: 0;
+  }
+
+  .side {
+    display: grid;
+    gap: 16px;
+  }
+  .side-card {
+    overflow: hidden;
+  }
+  .side-photo {
+    aspect-ratio: 16 / 9;
+  }
+  .side-in {
+    padding: 24px 28px;
+    display: grid;
+    gap: 16px;
+  }
+  .side h2 {
+    font-size: 26px;
+    line-height: 1;
+    margin: 0;
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 16px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .steps li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .steps .n {
+    font: 700 28px/1 var(--font-display);
+    color: var(--color-accent);
+    width: 22px;
+    flex: none;
+  }
+  .talk {
+    gap: 8px;
+  }
+  .talk p {
+    margin: 0;
+    font-size: 15px;
+  }
+  .talk .big {
+    font-weight: 700;
+    font-size: 17px;
+  }
+  .talk a {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+  [aria-disabled="true"] {
+    cursor: default;
+  }
+
+  @media (max-width: 980px) {
+    .layout {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+  }
+  @media (max-width: 480px) {
+    .two {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 560px) {
+    .page {
+      padding-top: 16px;
+    }
+    form.card,
+    .done {
+      padding: 24px 18px;
+      gap: 22px;
+    }
+    .quick {
+      grid-template-columns: 1fr;
+    }
+    .side-photo {
+      display: none;
+    }
+  }
+</style>

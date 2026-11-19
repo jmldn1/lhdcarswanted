@@ -44,6 +44,9 @@ const sales = brand.contact.phones[0];
         </a>
         <nav aria-label="Main">
           <a href="/cars" aria-current={path.startsWith("/cars") ? "page" : undefined}>Cars</a>
+          {brand.features.sellForm && (
+            <a href="/sell-your-car" aria-current={path === "/sell-your-car" ? "page" : undefined}>Sell your car</a>
+          )}
           {sales && <a class="tel" href={`tel:${sales.tel}`}>{sales.display}</a>}
         </nav>
       </div>

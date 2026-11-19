@@ -11,10 +11,12 @@ export const demo: Brand = {
     light: {
       bg: "#f6f4f0", surface: "#ffffff", fg: "#221c16", muted: "#6b6258",
       line: "#e2ddd5", accent: "#8a4b2a", accentInk: "#ffffff", picked: "#f4e9e2",
+      band: "#231c16", bandFg: "#ffffff", bandMuted: "#d6cbbf",
     },
     dark: {
       bg: "#17130f", surface: "#221c17", fg: "#efe9e2", muted: "#a89e93",
       line: "#3a322a", accent: "#d99a74", accentInk: "#17130f", picked: "#3a2a20",
+      band: "#0f0c09", bandFg: "#f3ede6", bandMuted: "#c4b8ab",
     },
   },
   fonts: {

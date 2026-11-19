@@ -1,4 +1,465 @@
 ---
-// The homepage isn't built yet; until it is, send visitors to the stock.
-return Astro.redirect("/cars", 302);
+// The homepage, from v2 mockup concept C as last changed: a short full-width
+// hero (the featured car, cropped top and bottom only, text over it at every
+// width), the featured car bar, makes, cars, the sell band, services and
+// the showroom. Copy in [BRACKETS] waits for the client.
+import Base from "../layouts/Base.astro";
+import CarCard from "../components/CarCard.astro";
+import CarPhoto from "../components/CarPhoto.astro";
+import { brand } from "../brands/index.ts";
+import { listCars, makesInStock, specsLine, priceLabel } from "../lib/cars.ts";
+import { getSitePhotos } from "../lib/site.ts";
+
+const allCars = await listCars();
+const forSale = allCars.filter((c) => c.status !== "sold");
+const site = await getSitePhotos();
+
+const featured = forSale.find((c) => c.slug === site.featured) ?? forSale.find((c) => c.photos.length);
+const heroPhoto = featured && (featured.photos[site.heroPhoto ?? 0] ?? featured.photos[0]);
+const grid = forSale.filter((c) => c !== featured).slice(0, 6);
+
+// Up to five makes, then a link to them all.
+const makes = makesInStock(forSale);
+const shownMakes = makes.slice(0, 5);
+
+const sales = brand.contact.phones[0];
+const browse = `Browse all ${forSale.length} cars`;
+
+// Services the old site claims. None is confirmed yet, so each stays a
+// placeholder until the client says which are true.
+const services = [
+  "[Part exchange]",
+  "[Finance]",
+  "[Warranty, with extensions]",
+  "[Reserve online with a refundable deposit]",
+];
 ---
+
+<Base title={`${brand.name}: left hand drive cars`} description={brand.copy.carsIntro}>
+  <main>
+    {featured && heroPhoto && (
+      <>
+        <section class="hero" aria-label="Featured car" style={`--focus: ${site.heroFocus ?? "50% 60%"}`}>
+          <CarPhoto
+            class="hero-img"
+            photo={heroPhoto}
+            fit="cover"
+            sizes="100vw"
+            priority
+            alt={`${featured.make} ${featured.model}`}
+          />
+          <div class="hero-shade"></div>
+          <div class="hero-text">
+            <div class="wrap">
+              <div class="hero-copy">
+                <div class="eyebrow">[LOCATION]</div>
+                <h1>Left hand drive cars, bought and sold</h1>
+                <div class="actions">
+                  <a class="btn btn-light" href="/cars">{browse}</a>
+                  <a class="btn btn-ghost" href="/sell-your-car">Sell your car</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="featured" aria-label="Featured car details">
+          <div class="wrap bar">
+            <div>
+              <div class="eyebrow">Featured · {featured.make}</div>
+              <div class="f-model">{featured.model}</div>
+              <div class="f-specs">{specsLine(featured)}</div>
+            </div>
+            <div class="f-buy">
+              <span class="f-price">{priceLabel(featured)}</span>
+              <a class="btn" href={`/cars/${featured.slug}`}>View car</a>
+            </div>
+          </div>
+        </section>
+      </>
+    )}
+
+    {!featured && (
+      <section class="plain-head">
+        <div class="wrap">
+          <h1>Left hand drive cars, bought and sold</h1>
+          <p>{brand.copy.carsEmpty}</p>
+        </div>
+      </section>
+    )}
+
+    {makes.length > 1 && (
+      <section class="section makes-sec">
+        <div class="wrap">
+          <h2 class="h-small">Browse by make</h2>
+          <div class="makes">
+            {shownMakes.map((m) => (
+              <a href={`/cars?make=${m.slug}`}>{m.make} <span>{m.count}</span></a>
+            ))}
+            <a href="/cars">{makes.length > shownMakes.length ? `All ${makes.length} makes` : "All cars"} <span aria-hidden="true" class="arrow">›</span></a>
+          </div>
+        </div>
+      </section>
+    )}
+
+    {grid.length > 0 && (
+      <section class="section">
+        <div class="wrap">
+          <div class="sec-head">
+            <h2 class="h-big">Available cars</h2>
+            <a class="more" href="/cars">See all {forSale.length} cars</a>
+          </div>
+          <div class="grid">
+            {grid.map((car, i) => <CarCard car={car} fit={brand.cardPhoto.fit} eager={i < 3} />)}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <section id="sell" class="sell">
+      <div class="wrap sell-in">
+        {site.sell && (
+          <div class="sell-photo">
+            <CarPhoto photo={site.sell} fit="contain" sizes="(min-width: 980px) 596px, calc(100vw - 32px)" alt="" />
+          </div>
+        )}
+        <div class="sell-copy">
+          <div class="eyebrow">Sell to us</div>
+          <h2>{brand.copy.sell?.bandHeading ?? "Got a car to sell?"}</h2>
+          {brand.copy.sell?.bandText && <p>{brand.copy.sell.bandText}</p>}
+          <div class="actions">
+            <a class="btn btn-light" href="/sell-your-car">Get my free valuation</a>
+            {brand.features.carsWanted && <a class="btn btn-ghost" href="/cars-wanted">See the cars we want</a>}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <h2 class="h-big services-h">[Services heading]</h2>
+        <div class="services">
+          {services.map((s) => (
+            <div>
+              <h3>{s}</h3>
+              <p>[One line, once the client confirms this service]</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section class="showroom">
+      <div class="wrap bar">
+        <div>
+          <h2 class="h-small">Visit us</h2>
+          <p>
+            {brand.contact.address} · {brand.contact.hours}
+            {brand.contact.viewings && <> · {brand.contact.viewings}</>}
+          </p>
+        </div>
+        <div class="actions">
+          {sales && (sales.tel
+            ? <a class="btn btn-primary" href={`tel:${sales.tel}`}>Call {sales.display}</a>
+            : <span class="btn btn-primary" aria-disabled="true">Call {sales.display}</span>)}
+          {brand.contact.googleProfileUrl && <a class="btn" href={brand.contact.googleProfileUrl}>Get directions</a>}
+        </div>
+      </div>
+    </section>
+  </main>
+</Base>
+
+<style>
+  /* Hero: short and full width, cropped top and bottom only. */
+  .hero {
+    position: relative;
+    height: clamp(260px, 30.56vw, 440px);
+    background: var(--color-band);
+    overflow: hidden;
+  }
+  .hero :global(.hero-img) {
+    position: absolute;
+    inset: 0;
+  }
+  .hero-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-band) 88%, transparent) 0%,
+      color-mix(in srgb, var(--color-band) 62%, transparent) 30%,
+      transparent 56%
+    );
+  }
+  .hero-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+  }
+  .hero-text .wrap {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .hero-copy {
+    max-width: 520px;
+    display: grid;
+    gap: 16px;
+    color: var(--color-band-fg);
+  }
+  .hero-copy .eyebrow,
+  .sell .eyebrow {
+    color: var(--color-band-muted);
+    letter-spacing: 0.14em;
+  }
+  .hero h1 {
+    font-size: clamp(34px, 4.4vw, 58px);
+    line-height: 0.98;
+    font-weight: 700;
+    margin: 0;
+  }
+  /* Phones: the text stays in the hero, over the bottom of the photo. */
+  @media (max-width: 760px) {
+    .hero {
+      height: auto;
+      min-height: 400px;
+      display: flex;
+      align-items: flex-end;
+    }
+    .hero-shade {
+      background: linear-gradient(
+        0deg,
+        color-mix(in srgb, var(--color-band) 92%, transparent) 0%,
+        color-mix(in srgb, var(--color-band) 65%, transparent) 45%,
+        transparent 78%
+      );
+    }
+    .hero-text {
+      position: relative;
+      inset: auto;
+      width: 100%;
+      padding-block: 28px 24px;
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .actions .btn {
+    min-height: 46px;
+    padding-inline: 20px;
+    box-sizing: border-box;
+  }
+  .btn-light {
+    background: var(--color-band-fg);
+    border-color: var(--color-band-fg);
+    color: var(--color-band);
+  }
+  .btn-ghost {
+    border-color: color-mix(in srgb, var(--color-band-fg) 70%, transparent);
+    color: var(--color-band-fg);
+  }
+
+  /* The featured car's bar, right under the hero. */
+  .featured {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-line);
+    padding-block: 20px 24px;
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px 24px;
+  }
+  .f-model {
+    font: 600 24px/1.15 var(--font-display);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .f-specs {
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .f-buy {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .f-price {
+    font: 700 26px/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+  .f-buy .btn {
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .plain-head {
+    padding-block: 48px 0;
+  }
+  .plain-head h1 {
+    font: 700 clamp(34px, 4.4vw, 56px)/0.98 var(--font-display);
+    margin: 0;
+  }
+
+  .section {
+    padding-block: 56px 0;
+  }
+  .makes-sec {
+    padding-top: 48px;
+  }
+  .h-small {
+    font-size: 28px;
+    line-height: 1;
+    margin: 0 0 16px;
+  }
+  .h-big {
+    font-size: clamp(30px, 3.6vw, 44px);
+    line-height: 1;
+    margin: 0;
+  }
+  .sec-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .more {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  /* Makes: a ruled grid of links. */
+  /* Each tile draws its own border (overlapping by 1px), so a short row
+     doesn't leave a rule running past it. */
+  .makes {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding: 1px 0 0 1px;
+  }
+  .makes a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 56px;
+    padding: 0 16px;
+    border: 1px solid var(--color-line);
+    margin: -1px 0 0 -1px;
+    background: var(--color-surface);
+    color: var(--color-fg);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .makes a:hover {
+    background: var(--color-picked);
+  }
+  .makes span {
+    color: var(--color-muted);
+    font-weight: 400;
+  }
+  .makes .arrow {
+    color: var(--color-accent);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  /* Sell band: dark in both themes. */
+  .sell {
+    margin-top: 72px;
+    background: var(--color-band);
+    color: var(--color-band-fg);
+    padding-block: 64px;
+  }
+  .sell-in {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: center;
+  }
+  .sell-photo {
+    aspect-ratio: 3 / 2;
+  }
+  .sell-copy {
+    display: grid;
+    gap: 16px;
+  }
+  .sell h2 {
+    font-size: clamp(34px, 4vw, 48px);
+    line-height: 1.02;
+    margin: 0;
+  }
+  .sell p {
+    margin: 0;
+    color: var(--color-band-muted);
+    font-size: 18px;
+  }
+
+  .services-h {
+    margin-bottom: 32px;
+  }
+  .services {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 48px;
+  }
+  .services h3 {
+    font-size: 24px;
+    line-height: 1.1;
+    margin: 0 0 6px;
+  }
+  .services p {
+    margin: 0;
+    color: var(--color-muted);
+  }
+
+  .showroom {
+    margin-top: 64px;
+    margin-bottom: -64px; /* the footer's own top margin */
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-line);
+    padding-block: 48px;
+  }
+  .showroom p {
+    margin: 8px 0 0;
+    color: var(--color-muted);
+  }
+  .showroom .h-small {
+    font-size: 30px;
+    margin: 0;
+  }
+  [aria-disabled="true"] {
+    cursor: default;
+  }
+
+  @media (max-width: 980px) {
+    .sell-in {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .makes {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 620px) {
+    .grid,
+    .services {
+      grid-template-columns: 1fr;
+    }
+    .makes {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

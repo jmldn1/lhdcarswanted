@@ -11,6 +11,10 @@ export interface Palette {
   accent: string;
   accentInk: string;
   picked: string;
+  /** Dark bands (the sell band, the hero's shade): dark in both themes. */
+  band: string;
+  bandFg: string;
+  bandMuted: string;
 }
 
 export interface Phone {
@@ -19,6 +23,22 @@ export interface Phone {
   display: string;
   /** For tel: links: "+447801110000". */
   tel: string;
+}
+
+/** The sell your car page's words. */
+export interface SellCopy {
+  /** The homepage's sell band. */
+  bandHeading: string;
+  bandText: string;
+  /** Small line above the heading. */
+  trust: string;
+  intro: string;
+  /** Ticked lines above the send button. */
+  promises: string[];
+  /** "What happens next", in order. */
+  steps: { title: string; text: string }[];
+  /** Under the thank-you heading. */
+  thanks: string;
 }
 
 export interface Brand {
@@ -37,6 +57,8 @@ export interface Brand {
     address: string;
     hours: string;
     viewings?: string;
+    /** WhatsApp number in international digits ("447801110000"); empty until known. */
+    whatsapp?: string;
     googleProfileUrl?: string;
   };
   features: {
@@ -52,6 +74,8 @@ export interface Brand {
     carsIntro: string;
     /** /cars with no stock. */
     carsEmpty: string;
+    /** /sell-your-car; needed when features.sellForm is on. */
+    sell?: SellCopy;
   };
   /**
    * How car photos sit in the /cars grid frame. "contain" shows the whole

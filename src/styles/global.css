@@ -11,6 +11,9 @@
   --color-accent: var(--brand-accent);
   --color-accent-ink: var(--brand-accent-ink);
   --color-picked: var(--brand-picked);
+  --color-band: var(--brand-band);
+  --color-band-fg: var(--brand-band-fg);
+  --color-band-muted: var(--brand-band-muted);
   --font-display: var(--brand-font-display);
   --font-body: var(--brand-font-body);
 }

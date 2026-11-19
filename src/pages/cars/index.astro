@@ -2,9 +2,13 @@
 import Base from "../../layouts/Base.astro";
 import CarCard from "../../components/CarCard.astro";
 import { brand } from "../../brands/index.ts";
-import { listCars } from "../../lib/cars.ts";
+import { listCars, makeSlug } from "../../lib/cars.ts";
 
-const cars = await listCars();
+const allCars = await listCars();
+// ?make=porsche (from the homepage's makes): only that make's cars.
+const makeParam = Astro.url.searchParams.get("make");
+const cars = makeParam ? allCars.filter((c) => makeSlug(c.make) === makeParam) : allCars;
+const makeName = makeParam ? cars[0]?.make : undefined;
 
 // How photos sit in the card frame comes from the brand. While we're still
 // choosing, ?fit=contain|cover overrides it and the dev build shows a switch.
@@ -18,13 +22,18 @@ const showSwitch = import.meta.env.DEV || q !== null;
     <header class="head">
       <h1>{brand.copy.carsTitle}</h1>
       <p>{brand.copy.carsIntro}</p>
+      {makeParam && (
+        <p class="filter">
+          {makeName ? `Showing ${cars.length} ${makeName}` : "No cars of that make right now"} · <a href="/cars">Show all {allCars.length} cars</a>
+        </p>
+      )}
     </header>
 
     {showSwitch && (
       <div class="switch" role="group" aria-label="Photo framing (for choosing)">
         <span>Card photos:</span>
-        <a href="?fit=contain" aria-current={fit === "contain" ? "true" : undefined}>Whole photo</a>
-        <a href="?fit=cover" aria-current={fit === "cover" ? "true" : undefined}>Fill the frame</a>
+        <a href={`?${makeParam ? `make=${makeParam}&` : ""}fit=contain`} aria-current={fit === "contain" ? "true" : undefined}>Whole photo</a>
+        <a href={`?${makeParam ? `make=${makeParam}&` : ""}fit=cover`} aria-current={fit === "cover" ? "true" : undefined}>Fill the frame</a>
       </div>
     )}
 
@@ -72,6 +81,10 @@ const showSwitch = import.meta.env.DEV || q !== null;
     font: 700 clamp(30px, 5vw, 44px)/1.05 var(--font-display);
     margin: 0;
     letter-spacing: 0.01em;
+  }
+  .head .filter {
+    color: var(--color-fg);
+    font-weight: 600;
   }
   .head p {
     margin: 0;

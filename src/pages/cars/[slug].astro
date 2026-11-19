@@ -1,10 +1,13 @@
 ---
-// A car's page (first cut). Photos are shown whole in a native swipe strip;
-// full-screen viewing (PhotoSwipe) and the enquiry form come next.
+// A car's page (first cut). Photos are shown whole in a native swipe strip,
+// with a row of thumbnails under it (as on London LHD Centre v1); full-screen
+// viewing is lightGallery (as on v1; its free GPLv3 build for now, see
+// BRIEF.md); the enquiry form comes next.
 import Base from "../../layouts/Base.astro";
 import CarPhoto from "../../components/CarPhoto.astro";
 import { brand } from "../../brands/index.ts";
 import { getCar, specsLine, priceLabel } from "../../lib/cars.ts";
+import { srcset, pick } from "../../lib/photos.ts";
 
 const car = await getCar(Astro.params.slug ?? "");
 if (!car) return new Response(null, { status: 404 });
@@ -14,6 +17,21 @@ const first = car.photos[0];
 // it); any photo of another shape is shown whole inside that frame.
 const ratio = first ? `${first.width} / ${first.height}` : "3 / 2";
 const sales = brand.contact.phones[0];
+
+// The full-screen gallery's photos: AVIF with the JPG as fallback, and a small
+// AVIF for its thumbnails. Text in subHtml is HTML there, so it is escaped.
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+const name = `${car.make} ${car.model}`;
+const lightbox = car.photos.map((p, i) => ({
+  src: p.jpg[p.jpg.length - 1].url,
+  srcset: srcset(p.jpg),
+  sizes: "100vw",
+  sources: [{ type: "image/avif", srcset: srcset(p.avif), sizes: "100vw" }],
+  thumb: pick(p.avif, 200).url,
+  alt: `${name}, photo ${i + 1} of ${car.photos.length}`,
+  subHtml: `<p>${esc(name)}</p>`,
+}));
+const lightboxJson = JSON.stringify(lightbox).replace(/</g, "\\u003c");
 ---
 
 <Base title={`${car.make} ${car.model}`} description={specsLine(car)}>
@@ -22,27 +40,49 @@ const sales = brand.contact.phones[0];
 
     <div class="layout">
       <section class="gallery" aria-label="Photos">
-        <div class="strip" style={`aspect-ratio:${ratio}`} tabindex="0">
-          {car.photos.map((p, i) => (
-            <figure class="slide" id={`photo-${i + 1}`}>
-              <CarPhoto
-                photo={p}
-                fit="contain"
-                priority={i === 0}
-                alt={`${car.make} ${car.model}, photo ${i + 1} of ${car.photos.length}`}
-                sizes="(min-width: 1240px) 780px, (min-width: 960px) 62vw, calc(100vw - 32px)"
-                style={i === 0 ? `view-transition-name: car-${car.id}` : undefined}
-              />
-            </figure>
-          ))}
+        <div class="frame" style={`aspect-ratio:${ratio}`}>
+          <div class="strip" tabindex="0">
+            {car.photos.map((p, i) => (
+              <figure class="slide" id={`photo-${i + 1}`}>
+                <CarPhoto
+                  photo={p}
+                  fit="contain"
+                  priority={i === 0}
+                  alt={`${car.make} ${car.model}, photo ${i + 1} of ${car.photos.length}`}
+                  sizes="(min-width: 1240px) 780px, (min-width: 960px) 62vw, calc(100vw - 32px)"
+                  style={i === 0 ? `view-transition-name: car-${car.id}` : undefined}
+                />
+              </figure>
+            ))}
+          </div>
+          {car.photos.length > 1 && (
+            <>
+              <div class="arrows">
+                <button class="prev" type="button" aria-label="Previous photo">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+                </button>
+                <button class="next" type="button" aria-label="Next photo">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+                </button>
+              </div>
+              <button class="view-all" type="button" aria-label={`View all ${car.photos.length} photos`}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
+                <span aria-hidden="true"><span class="wide">View all </span>{car.photos.length}</span>
+              </button>
+              <span class="counter" aria-hidden="true"><span class="n">1</span> / {car.photos.length}</span>
+            </>
+          )}
         </div>
         {car.photos.length > 1 && (
-          <div class="controls">
-            <button class="btn prev" type="button" aria-label="Previous photo">‹</button>
-            <span class="counter" aria-live="polite"><span class="n">1</span> of {car.photos.length}</span>
-            <button class="btn next" type="button" aria-label="Next photo">›</button>
+          <div class="thumbs">
+            {car.photos.map((p, i) => (
+              <button type="button" class="thumb" data-i={i} aria-label={`Show photo ${i + 1}`} aria-current={i === 0 ? "true" : undefined}>
+                <CarPhoto photo={p} fit="cover" sizes="(min-width: 960px) 180px, 27vw" />
+              </button>
+            ))}
           </div>
         )}
+        <script type="application/json" id="lightbox-photos" set:html={lightboxJson} />
       </section>
 
       <aside class="facts">
@@ -58,28 +98,94 @@ const sales = brand.contact.phones[0];
 </Base>
 
 <script>
-  // Arrows and the counter for the native strip (swipe and scroll need no script).
+  import "lightgallery/css/lightgallery.css";
+  import "lightgallery/css/lg-zoom.css";
+  import "lightgallery/css/lg-thumbnail.css";
+  import "lightgallery/css/lg-fullscreen.css";
+
+  // Arrows, counter and thumbnails for the native strip (swipe and scroll need no script).
   const strip = document.querySelector<HTMLElement>(".strip");
   const n = document.querySelector(".counter .n");
+  const row = document.querySelector<HTMLElement>(".thumbs");
+  const thumbs = [...document.querySelectorAll<HTMLButtonElement>(".thumb")];
   if (strip) {
-    const step = (dir: number) => strip.scrollBy({ left: dir * strip.clientWidth, behavior: "smooth" });
-    document.querySelector(".prev")?.addEventListener("click", () => step(-1));
-    document.querySelector(".next")?.addEventListener("click", () => step(1));
+    const go = (i: number) => strip.scrollTo({ left: i * strip.clientWidth, behavior: "smooth" });
+    const current = () => Math.round(strip.scrollLeft / strip.clientWidth);
+    document.querySelector(".prev")?.addEventListener("click", () => go(current() - 1));
+    document.querySelector(".next")?.addEventListener("click", () => go(current() + 1));
+    thumbs.forEach((t, i) => t.addEventListener("click", () => go(i)));
     strip.addEventListener("keydown", (e) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault();
-        step(e.key === "ArrowLeft" ? -1 : 1);
+        go(current() + (e.key === "ArrowLeft" ? -1 : 1));
       }
     });
+    // The photo showing: its number, its thumbnail marked and kept in view
+    // (by scrolling the row only, never the page).
+    const show = (i: number) => {
+      if (n) n.textContent = String(i + 1);
+      thumbs.forEach((t, j) => (j === i ? t.setAttribute("aria-current", "true") : t.removeAttribute("aria-current")));
+      const t = thumbs[i];
+      if (row && t) {
+        const left = t.offsetLeft - row.offsetLeft;
+        if (left < row.scrollLeft || left + t.offsetWidth > row.scrollLeft + row.clientWidth) {
+          row.scrollTo({ left: left - (row.clientWidth - t.offsetWidth) / 2, behavior: "smooth" });
+        }
+      }
+    };
     const io = new IntersectionObserver(
       (entries) => {
         for (const en of entries) {
-          if (en.isIntersecting && n) n.textContent = en.target.id.replace("photo-", "");
+          if (en.isIntersecting) show(Number(en.target.id.replace("photo-", "")) - 1);
         }
       },
       { root: strip, threshold: 0.6 },
     );
     strip.querySelectorAll(".slide").forEach((s) => io.observe(s));
+
+    // Full screen: lightGallery's script loads on the first open. Settings as
+    // on v1: a fade between photos, zoom, a fullscreen button, swipe down to
+    // close on phones, and smaller thumbnails there (with a button to hide
+    // them) so the photo gets the screen. Closing leaves the page on the
+    // photo last seen.
+    let gallery: { openGallery: (i: number) => void; index: number } | undefined;
+    const open = async (i: number) => {
+      if (!gallery) {
+        const [{ default: lightGallery }, { default: lgZoom }, { default: lgThumbnail }, { default: lgFullscreen }] =
+          await Promise.all([
+            import("lightgallery"),
+            import("lightgallery/plugins/zoom"),
+            import("lightgallery/plugins/thumbnail"),
+            import("lightgallery/plugins/fullscreen"),
+          ]);
+        const items = JSON.parse(document.getElementById("lightbox-photos")?.textContent ?? "[]");
+        const host = document.createElement("div");
+        document.body.append(host);
+        const phone = matchMedia("(max-width: 639px)").matches;
+        const lg = lightGallery(host, {
+          dynamic: true,
+          dynamicEl: items,
+          plugins: [lgZoom, lgThumbnail, lgFullscreen],
+          download: false,
+          mode: "lg-fade",
+          speed: 450,
+          swipeToClose: true,
+          allowMediaOverlap: phone,
+          toggleThumb: phone,
+          thumbWidth: phone ? 64 : 100,
+          thumbHeight: phone ? "48px" : "64px",
+          thumbMargin: 6,
+          mobileSettings: { controls: false, showCloseIcon: true, download: false },
+        });
+        host.addEventListener("lgBeforeClose", () => {
+          strip.scrollTo({ left: lg.index * strip.clientWidth, behavior: "instant" });
+        });
+        gallery = lg;
+      }
+      gallery.openGallery(i);
+    };
+    strip.querySelectorAll(".slide").forEach((s, i) => s.addEventListener("click", () => open(i)));
+    document.querySelector(".view-all")?.addEventListener("click", () => open(current()));
   }
 </script>
 
@@ -102,13 +208,17 @@ const sales = brand.contact.phones[0];
       align-items: start;
     }
   }
+  .frame {
+    position: relative;
+    background: var(--color-line);
+  }
   .strip {
     display: flex;
+    height: 100%;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
-    background: var(--color-line);
   }
   .strip::-webkit-scrollbar {
     display: none;
@@ -116,26 +226,131 @@ const sales = brand.contact.phones[0];
   .slide {
     flex: 0 0 100%;
     margin: 0;
+    cursor: zoom-in;
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
-  .controls {
+  /* Small arrows together in the bottom-left corner, the count bottom-right
+     (as on v1), so the thumbnails can sit right under the photo. */
+  .arrows {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 8px;
+    gap: 6px;
   }
-  .controls .btn {
-    font-size: 22px;
-    padding: 6px 16px;
-    border-color: var(--color-line);
+  .arrows button {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+    color: var(--color-fg);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--color-fg) 25%, transparent);
+    cursor: pointer;
+  }
+  .arrows button:hover {
     background: var(--color-surface);
   }
-  .counter {
-    color: var(--color-muted);
+  .arrows svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* "View all 11" top-right (just "11" with the icon on phones), as on v1. */
+  .view-all {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+    color: var(--color-fg);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--color-fg) 25%, transparent);
     font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .view-all:hover {
+    background: var(--color-surface);
+  }
+  .view-all svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .view-all .wide {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .view-all .wide {
+      display: inline;
+    }
+  }
+  .counter {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-fg) 70%, transparent);
+    color: var(--color-surface);
+    font-size: 13px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  /* 3½ thumbnails across on phones (the half shows there are more), 4 from 640px. */
+  .thumbs {
+    --across: 3.5;
+    --gap: 8px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - (var(--across) - 1) * var(--gap)) / var(--across));
+    gap: var(--gap);
+    margin-top: var(--gap);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  @media (min-width: 640px) {
+    .thumbs {
+      --across: 4;
+      --gap: 10px;
+    }
+  }
+  .thumb {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    padding: 0;
+    border: 0;
+    background: var(--color-line);
+    cursor: pointer;
+  }
+  /* The photo showing: an accent outline drawn inside the thumbnail. */
+  .thumb::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: outline-color 0.15s ease;
+  }
+  .thumb[aria-current="true"]::after {
+    outline-color: var(--color-accent);
   }
   .facts {
     display: grid;
@@ -159,5 +374,14 @@ const sales = brand.contact.phones[0];
     color: var(--color-muted);
     margin: 12px 0 0;
     overflow-wrap: anywhere;
+  }
+</style>
+
+<style is:global>
+  /* lightGallery's thumbnails: the photo showing in the brand accent (one
+     class more than its own rule, which loads after this). */
+  .lg-outer .lg-thumb .lg-thumb-item.active,
+  .lg-outer .lg-thumb .lg-thumb-item:hover {
+    border-color: var(--color-accent);
   }
 </style>
