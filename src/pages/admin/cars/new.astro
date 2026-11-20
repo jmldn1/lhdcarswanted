@@ -1,0 +1,64 @@
+---
+// Admin: add a car. Saved as a draft unless another status is chosen; its
+// photos upload with the form and are made web-ready in the background.
+import Admin from "../../../layouts/Admin.astro";
+import CarForm from "../../../components/admin/CarForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { newCarId, saveCar, uniqueSlug, type Car } from "../../../lib/cars.ts";
+import { readCarForm, type CarErrors } from "../../../lib/car-form.ts";
+import { checkUploads, queuePhotos } from "../../../lib/photo-queue.ts";
+import { setFeatured } from "../../../lib/site.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/cars", 303);
+
+const MAX_BODY = 160 * 1024 * 1024;
+let car: Car = { id: newCarId(), slug: "", make: "", model: "", price: null, description: "", status: "draft", photos: [] };
+let errors: CarErrors = {};
+let featured = false;
+
+if (Astro.request.method === "POST") {
+  if (Number(Astro.request.headers.get("content-length") ?? 0) > MAX_BODY) {
+    errors = { photos: "Too many photos at once (160 MB at most). Save the car with fewer, then add the rest." };
+  } else {
+    const form = await Astro.request.formData();
+    const read = readCarForm(form, car);
+    car = read.car;
+    errors = read.errors;
+    featured = read.featured;
+    const { ok, refused } = checkUploads(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0));
+    if (!Object.keys(errors).length) {
+      car.slug = await uniqueSlug(car.make, car.model);
+      await saveCar(car);
+      await queuePhotos(car.id, ok);
+      if (featured) await setFeatured(car.slug);
+      const note = refused.length ? `&refused=${encodeURIComponent(refused.join("; "))}` : "";
+      return Astro.redirect(`/admin/cars/${car.id}?saved=1${note}`, 303);
+    }
+    if (ok.length) errors.photos = "Please choose the photos again: they weren't kept while the form had a mistake.";
+  }
+  Astro.response.status = 400;
+}
+---
+
+<Admin title="Add a car" active="cars">
+  <div class="page">
+    <div>
+      <a class="up" href="/admin/cars">Cars</a>
+      <h1 class="admin-h1">Add a car</h1>
+    </div>
+    <CarForm car={car} errors={errors} featured={featured} mode="new" />
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+</style>

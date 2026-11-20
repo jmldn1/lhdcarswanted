@@ -137,3 +137,75 @@ export async function saveEnquiry(data: Enquiry, car: { id: string; name: string
   await fs.writeFile(path.join(dir, "request.json"), JSON.stringify(record, null, 2));
   return id;
 }
+
+// The admin's side: reading leads, and each lead's stage and notes, kept in
+// admin.json beside request.json (which is never changed).
+
+export type LeadKind = "sell" | "enquiries";
+export const LEAD_KINDS: LeadKind[] = ["sell", "enquiries"];
+export const STAGES: Record<LeadKind, string[]> = {
+  sell: ["New", "Contacted", "Offer made", "Bought", "Not going ahead"],
+  enquiries: ["New", "Replied", "Viewing booked", "Sold", "Closed"],
+};
+
+export interface LeadAdmin {
+  stage: string;
+  notes: string;
+}
+export interface Lead {
+  kind: LeadKind;
+  id: string;
+  receivedAt: string;
+  // What the form saved (SellRequest or Enquiry fields, plus photos/car).
+  request: Record<string, unknown>;
+  admin: LeadAdmin;
+}
+
+const leadsRoot = () => process.env.LEADS_DIR || path.resolve("data/leads");
+// Folder names are made by newLeadDir; anything else is never read.
+const LEAD_ID = /^\d{4}-\d\d-\d\d-[0-9a-f]{12}$/;
+const PHOTO_FILE = /^photo-\d\d\.(jpg|png|webp|heic|heif|avif|img)$/;
+
+async function readJson(file: string): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await fs.readFile(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export async function getLead(kind: LeadKind, id: string): Promise<Lead | null> {
+  if (!LEAD_KINDS.includes(kind) || !LEAD_ID.test(id)) return null;
+  const dir = path.join(leadsRoot(), kind, id);
+  const request = await readJson(path.join(dir, "request.json"));
+  if (!request) return null;
+  const saved = (await readJson(path.join(dir, "admin.json"))) ?? {};
+  return {
+    kind,
+    id,
+    receivedAt: String(request.receivedAt ?? ""),
+    request,
+    admin: { stage: String(saved.stage ?? "New"), notes: String(saved.notes ?? "") },
+  };
+}
+
+/** Newest first. */
+export async function listLeads(kind: LeadKind): Promise<Lead[]> {
+  const ids = (await fs.readdir(path.join(leadsRoot(), kind)).catch(() => [] as string[])).filter((d) => LEAD_ID.test(d));
+  const leads = (await Promise.all(ids.map((id) => getLead(kind, id)))).filter((l): l is Lead => Boolean(l));
+  return leads.sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+}
+
+export async function saveLeadAdmin(kind: LeadKind, id: string, admin: LeadAdmin): Promise<boolean> {
+  if (!(await getLead(kind, id))) return false;
+  const stage = STAGES[kind].includes(admin.stage) ? admin.stage : "New";
+  const record = { stage, notes: admin.notes.slice(0, 8000), updatedAt: new Date().toISOString() };
+  await fs.writeFile(path.join(leadsRoot(), kind, id, "admin.json"), JSON.stringify(record, null, 2));
+  return true;
+}
+
+/** The path of a photo a seller sent, or null if the names aren't ones this site made. */
+export function leadPhotoPath(kind: string, id: string, file: string): string | null {
+  if (!LEAD_KINDS.includes(kind as LeadKind) || !LEAD_ID.test(id) || !PHOTO_FILE.test(file)) return null;
+  return path.join(leadsRoot(), kind, id, file);
+}

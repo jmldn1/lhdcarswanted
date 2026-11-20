@@ -1,0 +1,150 @@
+---
+// Admin sign-in: one password (see src/lib/auth.ts). After signing in, back
+// to the page that asked for it.
+import "../../styles/global.css";
+import { brand, brandCss } from "../../brands/index.ts";
+import { COOKIE, authReady, signIn, isSignedIn, tooManyTries, noteFailedTry } from "../../lib/auth.ts";
+
+const nextRaw = Astro.url.searchParams.get("next") ?? "";
+// Only a path inside the admin, never another site.
+const next = /^\/admin(\/|$|\?)/.test(nextRaw) && !nextRaw.startsWith("//") ? nextRaw : "/admin/cars";
+
+if (isSignedIn(Astro.cookies.get(COOKIE)?.value)) return Astro.redirect(next, 303);
+
+let error = "";
+if (Astro.request.method === "POST") {
+  const ip = Astro.clientAddress;
+  if (tooManyTries(ip)) {
+    error = "Too many tries. Wait 15 minutes, then try again.";
+  } else {
+    const form = await Astro.request.formData();
+    const session = signIn(String(form.get("password") ?? ""));
+    if (session) {
+      Astro.cookies.set(COOKIE, session.value, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: import.meta.env.PROD,
+        maxAge: session.maxAge,
+      });
+      return Astro.redirect(next, 303);
+    }
+    noteFailedTry(ip);
+    error = "That password isn't right.";
+  }
+  Astro.response.status = 401;
+}
+---
+
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sign in | {brand.name} admin</title>
+    <style is:inline set:html={brandCss()}></style>
+  </head>
+  <body>
+    <main class="box">
+      <div class="logo">
+        <span class="top">{brand.logo.top}</span>
+        <span class="bottom">{brand.logo.bottom} · Admin</span>
+      </div>
+      {authReady() ? (
+        <form method="post">
+          <h1>Sign in</h1>
+          <div>
+            <label for="pw">Password</label>
+            <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus aria-invalid={error ? "true" : undefined} aria-describedby={error ? "pw-err" : undefined} />
+            {error && <p class="err" id="pw-err" role="alert">{error}</p>}
+          </div>
+          <button type="submit">Sign in</button>
+        </form>
+      ) : (
+        <div>
+          <h1>Not set up yet</h1>
+          <p>Set the admin password on the server first: <code>npm run admin:password</code>, then restart the site.</p>
+        </div>
+      )}
+    </main>
+  </body>
+</html>
+
+<style>
+  body {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .box {
+    width: 100%;
+    max-width: 380px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    box-sizing: border-box;
+  }
+  .logo {
+    display: grid;
+    line-height: 1;
+  }
+  .logo .top {
+    font: 700 26px/0.95 var(--font-display);
+    letter-spacing: 0.06em;
+    color: var(--color-accent);
+  }
+  .logo .bottom {
+    font: 600 11px/1.3 var(--font-display);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  h1 {
+    font: 700 32px/1 var(--font-display);
+    margin: 0;
+  }
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 50px;
+    padding: 0 14px;
+    border: 1px solid var(--color-muted);
+    font: 400 16px/1 var(--font-body);
+  }
+  input:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  .err {
+    margin: 6px 0 0;
+    color: #b42318;
+    font-weight: 600;
+  }
+  button {
+    min-height: 50px;
+    border: 0;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    font: 700 16px/1 var(--font-body);
+    cursor: pointer;
+  }
+  code {
+    font-size: 14px;
+  }
+</style>

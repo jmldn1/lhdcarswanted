@@ -1,0 +1,153 @@
+---
+// Admin: edit a car. Save applies the details, the photo order and any
+// photos ticked to remove (their files are deleted too). Delete needs a
+// tick to confirm, and removes the car and all its photo files.
+import Admin from "../../../layouts/Admin.astro";
+import CarForm from "../../../components/admin/CarForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { adminCar, saveCar, setPhotos, deleteCar, type Car } from "../../../lib/cars.ts";
+import { readCarForm, readPhotoChanges, type CarErrors } from "../../../lib/car-form.ts";
+import { checkUploads, queuePhotos, deletePhotoFiles, deleteCarFiles, startPhotoWork } from "../../../lib/photo-queue.ts";
+import { getSitePhotos, setFeatured } from "../../../lib/site.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/cars", 303);
+const found = await adminCar(Astro.params.id ?? "");
+if (!found) return new Response("No such car", { status: 404 });
+let car: Car = found;
+
+const site = await getSitePhotos();
+const wasFeatured = Boolean(car.slug) && site.featured === car.slug;
+let featured = wasFeatured;
+let errors: CarErrors = {};
+let refused: string[] = [];
+let deleteError = "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (form.get("intent") === "delete") {
+    if (form.get("confirm") === "on") {
+      await deleteCar(car.id);
+      await deleteCarFiles(car.id);
+      if (wasFeatured) await setFeatured(undefined);
+      return Astro.redirect("/admin/cars?deleted=1", 303);
+    }
+    deleteError = "Tick the box to confirm.";
+  } else {
+    const read = readCarForm(form, car);
+    errors = read.errors;
+    featured = read.featured;
+    const uploads = checkUploads(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0));
+    refused = uploads.refused;
+    if (!Object.keys(errors).length) {
+      await saveCar(read.car);
+      const { order, removed } = readPhotoChanges(form);
+      for (const p of await setPhotos(car.id, order, removed)) await deletePhotoFiles(car.id, p);
+      await queuePhotos(car.id, uploads.ok);
+      if (featured && !wasFeatured) await setFeatured(car.slug);
+      if (!featured && wasFeatured) await setFeatured(undefined);
+      const note = refused.length ? `&refused=${encodeURIComponent(refused.join("; "))}` : "";
+      return Astro.redirect(`/admin/cars/${car.id}?saved=1${note}`, 303);
+    }
+    car = { ...read.car, photos: car.photos, pending: car.pending };
+  }
+  Astro.response.status = 400;
+}
+
+if (car.pending?.length) startPhotoWork();
+const saved = Astro.url.searchParams.get("saved") === "1";
+const refusedNote = Astro.url.searchParams.get("refused");
+if (refusedNote) refused = [refusedNote.slice(0, 500)];
+const name = `${car.make} ${car.model}`.trim() || "Car";
+---
+
+<Admin title={name} active="cars">
+  <div class="page">
+    <div class="head">
+      <div>
+        <a class="up" href="/admin/cars">Cars</a>
+        <h1 class="admin-h1">{name}</h1>
+        {car.updatedAt && (
+          <p class="when">
+            Last saved {new Date(car.updatedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+          </p>
+        )}
+      </div>
+      {car.status !== "draft" && car.slug && <a class="a-btn" href={`/cars/${car.slug}`} target="_blank" rel="noopener">View on the site</a>}
+    </div>
+
+    {saved && <p class="a-note" role="status">Saved.</p>}
+
+    <CarForm car={car} errors={errors} featured={featured} mode="edit" refused={refused} />
+
+    <details class="danger" open={Boolean(deleteError)}>
+      <summary>Delete this car</summary>
+      <form method="post">
+        <input type="hidden" name="intent" value="delete" />
+        <p>This removes the car from the site and deletes all its photos. It can't be undone.</p>
+        <label class="check"><input type="checkbox" name="confirm" /> Yes, delete the {name} and its photos</label>
+        {deleteError && <p class="a-err" role="alert">{deleteError}</p>}
+        <button class="a-btn del" type="submit">Delete the car</button>
+      </form>
+    </details>
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .when {
+    margin: 4px 0 0;
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .danger summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #b42318;
+    padding: 8px 0;
+  }
+  .danger form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 18px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .danger p {
+    margin: 0;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .del {
+    border-color: #b42318;
+    background: #b42318;
+    color: #fff;
+  }
+</style>

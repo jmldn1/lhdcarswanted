@@ -8,3 +8,6 @@ dist/
 # Test stock and photos; never commit
 data/
 public/photos/
+
+# The example settings file (names only, no values) is committed
+!.env.example

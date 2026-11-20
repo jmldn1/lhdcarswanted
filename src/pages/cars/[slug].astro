@@ -10,20 +10,14 @@ import Base from "../../layouts/Base.astro";
 import CarPhoto from "../../components/CarPhoto.astro";
 import CarCard from "../../components/CarCard.astro";
 import { brand } from "../../brands/index.ts";
-import { getCar, listCars, specsLine, priceLabel, makeSlug, nice } from "../../lib/cars.ts";
+import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../../lib/cars.ts";
 import { lightboxJson } from "../../lib/lightbox.ts";
 
 const car = await getCar(Astro.params.slug ?? "");
 if (!car) return new Response(null, { status: 404 });
 
-// The facts the car's record has; the rest (gearbox, engine...) need fields
-// of their own first.
-const facts = [
-  ["Year", car.year],
-  ["Mileage", car.mileage],
-  ["Colour", car.colour && nice(car.colour)],
-  ["Registered", car.registered && nice(car.registered)],
-].filter((f): f is [string, string] => Boolean(f[1]));
+// The facts the car's record has.
+const facts = carFacts(car);
 // Two other cars for sale, then a tile linking to them all.
 const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== "sold").slice(0, 2);
 const whatsapp = brand.contact.whatsapp;

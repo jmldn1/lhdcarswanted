@@ -83,8 +83,14 @@ site. Started 18 November 2026.
    650S Spider, 993) plus a test F355, from mercury's photos.
 3. ~~Homepage from mockup C~~ Built 18 Nov 2026 with placeholder colours and
    copy. Still to do: colours and logo (see decision 1).
-4. MongoDB stock with this site's own database, and the admin for adding cars
-   with photos encoded in the background.
+4. ~~MongoDB stock and the admin~~ Built 20 Nov 2026 from the admin mockups
+   (https://claude.ai/artifact/FqtX5qVva7XhWZyhMEX8eZ): /admin with one
+   password (hash in .env), cars (draft / for sale / reserved / sold,
+   gearbox, engine, steering, featured on the homepage, photos uploaded and
+   made web-ready in the background) and leads (sell requests and
+   enquiries, with a stage and notes). Cars are in this site's own MongoDB
+   database (`lhdcarswanted`); leads stay as files in `LEADS_DIR`. Not built
+   yet: cars wanted, homepage photos (hero choice and focus) and settings.
 5. ~~Sell your car form~~ Built 18 Nov 2026 at /sell-your-car from the mockup
    (https://claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv), to be refined. It
    saves each request to `LEADS_DIR`; still to do: email each one to the

@@ -1,0 +1,604 @@
+---
+// The admin's add/edit car form, from the admin mockups: photos first, then
+// the details and description, and beside them "On the site" and the price.
+//
+// Photos: new ones go up with the form (a new car), or straight away when
+// chosen (a car being edited, with JavaScript), and are made web-ready in
+// the background; this page checks every few seconds and adds them as they
+// finish. Order is set by dragging, or with the arrows (phones); the first
+// is the cover. Removing is a tick, applied on Save.
+import type { Car } from "../../lib/cars.ts";
+import type { CarErrors } from "../../lib/car-form.ts";
+import { pick } from "../../lib/photos.ts";
+
+interface Props {
+  car: Car;
+  errors: CarErrors;
+  featured: boolean;
+  mode: "new" | "edit";
+  refused?: string[];
+}
+const { car, errors, featured, mode, refused = [] } = Astro.props;
+const err = (k: keyof CarErrors) => errors[k];
+const STATUS: [Car["status"], string, string][] = [
+  ["draft", "Draft", "Not on the site yet. Only you can see it here."],
+  ["available", "For sale", "On the site and in the cars list."],
+  ["reserved", "Reserved", "Stays on the site with a Reserved label."],
+  ["sold", "Sold", "Stays on the site with a Sold label."],
+];
+const pending = car.pending ?? [];
+---
+
+<form method="post" enctype="multipart/form-data" class="car-form" data-mode={mode} data-car={car.id} novalidate>
+  <input type="hidden" name="intent" value="save" />
+
+  <section class="admin-box" aria-labelledby="ph-h">
+    <div class="ph-head">
+      <h2 id="ph-h">Photos <span class="count">{car.photos.length}{pending.length ? ` · ${pending.length} on the way` : ""}</span></h2>
+      <p class="a-hint">Drag, or use the arrows, to change the order. The first photo is the cover. Photos are kept whole, never cropped.</p>
+    </div>
+
+    <div class="pickers">
+      <label class="a-btn pri picker">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+        Take a photo
+        <input type="file" name="photos" accept="image/*" capture="environment" />
+      </label>
+      <label class="a-btn picker">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v3h16v-3M12 4v11M7 9l5-5 5 5" /></svg>
+        Choose photos
+        <input type="file" name="photos" accept="image/*" multiple />
+      </label>
+      <span class="chosen a-hint" aria-live="polite"></span>
+    </div>
+    {mode === "new" && <p class="a-hint">They upload when you save, then are made web-ready in the background.</p>}
+    {refused.length > 0 && <p class="a-err" role="alert">Not added: {refused.join("; ")}</p>}
+    {err("photos") && <p class="a-err" role="alert">{err("photos")}</p>}
+
+    <input type="hidden" name="order" value={car.photos.map((p) => p.id).join(",")} />
+    <ol class="photos">
+      {car.photos.map((p, i) => (
+        <li class="ph" draggable="true" data-id={p.id}>
+          <img src={pick(p.avif, 300).url} alt={`Photo ${i + 1}`} loading="lazy" />
+          <span class="num" aria-hidden="true">{i + 1}</span>
+          <span class="cover">Cover</span>
+          <span class="tools">
+            <button type="button" class="mv" data-dir="-1" aria-label="Move earlier">‹</button>
+            <button type="button" class="mv" data-dir="1" aria-label="Move later">›</button>
+          </span>
+          <label class="rm"><input type="checkbox" name="remove" value={p.id} /> Remove</label>
+        </li>
+      ))}
+      {pending.map((p) => (
+        <li class="ph busy" data-pending={p.id}>
+          <span>Making web-ready…</span>
+          <span class="bar" aria-hidden="true"><i></i></span>
+          <span class="file">{p.name}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <div class="cols">
+    <div class="col-main">
+      <section class="admin-box" aria-labelledby="d-h">
+        <h2 id="d-h">Details</h2>
+        <div class="grid2">
+          <div>
+            <label class="a-lbl" for="f-make">Make</label>
+            <input class="a-in" id="f-make" name="make" value={car.make} required aria-invalid={err("make") ? "true" : undefined} aria-describedby={err("make") ? "f-make-err" : undefined} />
+            {err("make") && <p class="a-err" id="f-make-err">{err("make")}</p>}
+          </div>
+          <div>
+            <label class="a-lbl" for="f-model">Model</label>
+            <input class="a-in" id="f-model" name="model" value={car.model} required aria-invalid={err("model") ? "true" : undefined} aria-describedby={err("model") ? "f-model-err" : undefined} />
+            {err("model") && <p class="a-err" id="f-model-err">{err("model")}</p>}
+          </div>
+          <div>
+            <label class="a-lbl" for="f-year">Year</label>
+            <input class="a-in" id="f-year" name="year" inputmode="numeric" maxlength="4" value={car.year} aria-invalid={err("year") ? "true" : undefined} aria-describedby={err("year") ? "f-year-err" : undefined} />
+            {err("year") && <p class="a-err" id="f-year-err">{err("year")}</p>}
+          </div>
+          <div>
+            <label class="a-lbl" for="f-miles">Mileage</label>
+            <input class="a-in" id="f-miles" name="mileage" value={car.mileage} placeholder="17,000 miles" />
+          </div>
+          <div>
+            <label class="a-lbl" for="f-colour">Colour <span class="a-opt">(optional)</span></label>
+            <input class="a-in" id="f-colour" name="colour" value={car.colour} />
+          </div>
+          <div>
+            <label class="a-lbl" for="f-reg">Registered in <span class="a-opt">(optional)</span></label>
+            <input class="a-in" id="f-reg" name="registered" value={car.registered} placeholder="UK, Germany, not registered…" />
+          </div>
+          <div>
+            <label class="a-lbl" for="f-gear">Gearbox <span class="a-opt">(optional)</span></label>
+            <select class="a-in" id="f-gear" name="gearbox">
+              <option value="">Not set</option>
+              <option selected={car.gearbox === "Manual"}>Manual</option>
+              <option selected={car.gearbox === "Automatic"}>Automatic</option>
+            </select>
+          </div>
+          <div>
+            <label class="a-lbl" for="f-engine">Engine <span class="a-opt">(optional)</span></label>
+            <input class="a-in" id="f-engine" name="engine" value={car.engine} placeholder="3.8 litre" />
+          </div>
+        </div>
+        <fieldset>
+          <legend class="a-lbl">Steering</legend>
+          <div class="a-pills">
+            <label class="a-pill"><input type="radio" name="steering" value="LHD" checked={car.steering === "LHD"} /><span>Left hand drive</span></label>
+            <label class="a-pill"><input type="radio" name="steering" value="RHD" checked={car.steering === "RHD"} /><span>Right hand drive</span></label>
+            <label class="a-pill"><input type="radio" name="steering" value="" checked={!car.steering} /><span>Not set</span></label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="admin-box" aria-labelledby="desc-h">
+        <h2 id="desc-h">Description</h2>
+        <div>
+          <label class="a-lbl" for="f-desc">Shown under the photos on the car's page</label>
+          <textarea class="a-in" id="f-desc" name="description" rows="7">{car.description}</textarea>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-side">
+      <section class="admin-box" aria-labelledby="st-h">
+        <h2 id="st-h">On the site</h2>
+        <fieldset>
+          <legend class="sr">Status</legend>
+          <div class="a-pills">
+            {STATUS.map(([value, label]) => (
+              <label class="a-pill"><input type="radio" name="status" value={value} checked={car.status === value} /><span>{label}</span></label>
+            ))}
+          </div>
+          <ul class="st-hints a-hint">
+            {STATUS.map(([value, label, hint]) => <li data-for={value}><strong>{label}:</strong> {hint}</li>)}
+          </ul>
+        </fieldset>
+        <label class="check"><input type="checkbox" name="featured" checked={featured} /> Featured on the homepage</label>
+        {car.slug && (
+          <div>
+            <span class="a-lbl">Web address</span>
+            <p class="addr">/cars/{car.slug}</p>
+            <p class="a-hint">Kept if you rename the car, so links don't break.</p>
+          </div>
+        )}
+      </section>
+
+      <section class="admin-box" aria-labelledby="pr-h">
+        <h2 id="pr-h">Price</h2>
+        <div>
+          <label class="a-lbl" for="f-price">Price (£)</label>
+          <input class="a-in" id="f-price" name="price" inputmode="numeric" value={car.price ?? ""} placeholder="65000" aria-invalid={err("price") ? "true" : undefined} aria-describedby={err("price") ? "f-price-err" : undefined} />
+          {err("price") && <p class="a-err" id="f-price-err">{err("price")}</p>}
+        </div>
+        <label class="check"><input type="checkbox" name="poa" checked={car.price === null && mode === "edit"} /> Price on application (shows POA)</label>
+      </section>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="a-btn pri" type="submit">{mode === "new" ? "Save the car" : "Save changes"}</button>
+  </div>
+</form>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>(".car-form");
+  if (form) {
+    const list = form.querySelector<HTMLOListElement>(".photos")!;
+    const order = form.querySelector<HTMLInputElement>('input[name="order"]')!;
+    const chosen = form.querySelector<HTMLElement>(".chosen")!;
+    const carId = form.dataset.car!;
+    const editing = form.dataset.mode === "edit";
+
+    // Order: renumber, mark the cover and keep the hidden list in step.
+    const sync = () => {
+      const tiles = [...list.querySelectorAll<HTMLLIElement>("li[data-id]")];
+      tiles.forEach((li, i) => {
+        li.querySelector(".num")!.textContent = String(i + 1);
+        li.querySelector("img")!.alt = `Photo ${i + 1}`;
+      });
+      order.value = tiles.map((li) => li.dataset.id).join(",");
+    };
+    let dragged: HTMLLIElement | null = null;
+    list.addEventListener("dragstart", (e) => {
+      dragged = (e.target as HTMLElement).closest("li[data-id]");
+      dragged?.classList.add("dragging");
+    });
+    list.addEventListener("dragover", (e) => {
+      const over = (e.target as HTMLElement).closest<HTMLLIElement>("li[data-id]");
+      if (!dragged || !over || over === dragged) return;
+      e.preventDefault();
+      const r = over.getBoundingClientRect();
+      if (e.clientX > r.left + r.width / 2) over.after(dragged);
+      else over.before(dragged);
+    });
+    list.addEventListener("dragend", () => {
+      dragged?.classList.remove("dragging");
+      dragged = null;
+      sync();
+    });
+    list.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>(".mv");
+      if (!btn) return;
+      const li = btn.closest<HTMLLIElement>("li")!;
+      if (btn.dataset.dir === "-1") li.previousElementSibling?.before(li);
+      else {
+        const next = li.nextElementSibling as HTMLLIElement | null;
+        if (next?.dataset.id) next.after(li);
+      }
+      sync();
+      btn.focus();
+    });
+
+    // Adds a tile for a photo that has just become web-ready.
+    const addTile = (p: { id: string; thumb: string }) => {
+      const li = document.createElement("li");
+      li.className = "ph";
+      li.draggable = true;
+      li.dataset.id = p.id;
+      li.innerHTML =
+        '<img alt=""><span class="num" aria-hidden="true"></span><span class="cover">Cover</span>' +
+        '<span class="tools"><button type="button" class="mv" data-dir="-1" aria-label="Move earlier">‹</button>' +
+        '<button type="button" class="mv" data-dir="1" aria-label="Move later">›</button></span>' +
+        '<label class="rm"><input type="checkbox" name="remove"> Remove</label>';
+      li.querySelector("img")!.src = p.thumb;
+      li.querySelector<HTMLInputElement>('input[name="remove"]')!.value = p.id;
+      const firstBusy = list.querySelector("li.busy");
+      firstBusy ? firstBusy.before(li) : list.append(li);
+    };
+    const busyTile = (id: string, name: string) => {
+      const li = document.createElement("li");
+      li.className = "ph busy";
+      li.dataset.pending = id;
+      li.innerHTML = '<span>Making web-ready…</span><span class="bar" aria-hidden="true"><i></i></span><span class="file"></span>';
+      li.querySelector(".file")!.textContent = name;
+      list.append(li);
+      return li;
+    };
+
+    // Every few seconds while photos are on the way: add the finished ones.
+    let polling = false;
+    const poll = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        for (;;) {
+          const res = await fetch(`/admin/cars/${carId}/photos`, { headers: { accept: "application/json" } });
+          if (!res.ok) break;
+          const state: { photos: { id: string; thumb: string }[]; pending: { id: string; name: string }[] } = await res.json();
+          const have = new Set([...list.querySelectorAll<HTMLLIElement>("li[data-id]")].map((li) => li.dataset.id));
+          state.photos.filter((p) => !have.has(p.id)).forEach(addTile);
+          const waiting = new Set(state.pending.map((p) => p.id));
+          list.querySelectorAll<HTMLLIElement>("li[data-pending]").forEach((li) => {
+            if (!waiting.has(li.dataset.pending!) && !li.dataset.uploading) li.remove();
+          });
+          sync();
+          form.querySelector(".count")!.textContent =
+            `${have.size + state.photos.filter((p) => !have.has(p.id)).length}${state.pending.length ? ` · ${state.pending.length} on the way` : ""}`;
+          if (!state.pending.length && !list.querySelector("li[data-uploading]")) break;
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+      } finally {
+        polling = false;
+      }
+    };
+
+    form.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((input) => {
+      input.addEventListener("change", async () => {
+        const files = [...(input.files ?? [])];
+        if (!files.length) return;
+        if (!editing) {
+          // A new car: they go up with the form.
+          const n = [...form.querySelectorAll<HTMLInputElement>('input[type="file"]')].reduce((s, i) => s + (i.files?.length ?? 0), 0);
+          chosen.textContent = `${n} ${n === 1 ? "photo" : "photos"} ready to upload with the car`;
+          return;
+        }
+        // Editing: upload now, one at a time, then let the server work.
+        for (const f of files) {
+          const tile = busyTile(`up-${Math.random()}`, f.name);
+          tile.dataset.uploading = "1";
+          tile.querySelector("span")!.textContent = "Uploading…";
+          const body = new FormData();
+          body.append("photos", f);
+          const res = await fetch(`/admin/cars/${carId}/photos`, { method: "POST", body, headers: { accept: "application/json" } }).catch(() => null);
+          const out = res && (await res.json().catch(() => null));
+          tile.remove();
+          if (!res?.ok) {
+            chosen.textContent = `${f.name} wasn't added${out?.error ? `: ${out.error}` : ""}.`;
+            continue;
+          }
+          for (const p of out.pending as { id: string; name: string }[]) {
+            if (!list.querySelector(`li[data-pending="${p.id}"]`)) busyTile(p.id, p.name);
+          }
+        }
+        input.value = "";
+        poll();
+      });
+    });
+    if (list.querySelector("li[data-pending]")) poll();
+
+    // The hint under the status shows only for the one chosen.
+    const hints = form.querySelectorAll<HTMLElement>(".st-hints li");
+    const showHint = () => {
+      const v = form.querySelector<HTMLInputElement>('input[name="status"]:checked')?.value;
+      hints.forEach((h) => (h.hidden = h.dataset.for !== v));
+    };
+    form.querySelectorAll('input[name="status"]').forEach((r) => r.addEventListener("change", showHint));
+    showHint();
+
+    // POA: the price box is greyed out while it's ticked.
+    const poa = form.querySelector<HTMLInputElement>('input[name="poa"]')!;
+    const price = form.querySelector<HTMLInputElement>('input[name="price"]')!;
+    const syncPoa = () => (price.disabled = poa.checked);
+    poa.addEventListener("change", syncPoa);
+    syncPoa();
+  }
+</script>
+
+<style>
+  .car-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .ph-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px 16px;
+  }
+  .ph-head h2 {
+    font: 700 24px/1.1 var(--font-display);
+    margin: 0;
+  }
+  .ph-head .a-hint {
+    margin: 0;
+  }
+  .count {
+    font: 400 15px/1 var(--font-body);
+    color: var(--color-muted);
+  }
+  .pickers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .picker {
+    position: relative;
+  }
+  .picker input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+  }
+  .picker:focus-within {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .photos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .ph {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    background: var(--color-line);
+    overflow: hidden;
+    cursor: grab;
+  }
+  .ph.dragging {
+    opacity: 0.4;
+  }
+  .ph img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .num {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    box-sizing: border-box;
+    background: color-mix(in srgb, #16181d 80%, transparent);
+    color: #fff;
+    font: 700 12px/24px var(--font-body);
+    text-align: center;
+  }
+  .cover {
+    display: none;
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    padding: 3px 8px;
+    background: var(--color-accent);
+    color: var(--color-accent-ink);
+    font: 700 12px/1.2 var(--font-body);
+  }
+  .photos li[data-id]:first-child .cover {
+    display: block;
+  }
+  .tools {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    display: flex;
+    gap: 4px;
+  }
+  .mv {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    background: color-mix(in srgb, #fff 92%, transparent);
+    color: #16181d;
+    font: 700 18px/1 var(--font-body);
+    cursor: pointer;
+  }
+  .rm {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: color-mix(in srgb, #fff 92%, transparent);
+    color: #16181d;
+    font: 600 12px/1 var(--font-body);
+    cursor: pointer;
+  }
+  .rm:has(input:checked) {
+    background: #b42318;
+    color: #fff;
+  }
+  .ph:has(.rm input:checked) img {
+    opacity: 0.35;
+  }
+  .busy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    box-sizing: border-box;
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+    font: 600 13px/1.3 var(--font-body);
+    cursor: default;
+  }
+  .busy .file {
+    font-weight: 400;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+  }
+  .bar {
+    height: 6px;
+    background: var(--color-line);
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: var(--color-accent);
+    animation: slide 1.4s ease-in-out infinite;
+  }
+  @keyframes slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(250%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar i {
+      animation: none;
+    }
+  }
+  .cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .col-main {
+    flex: 999 1 520px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .col-side {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+  }
+  @media (max-width: 559px) {
+    .grid2 {
+      grid-template-columns: 1fr;
+    }
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .st-hints {
+    list-style: none;
+    padding: 0;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--color-accent);
+  }
+  .addr {
+    margin: 0;
+    padding: 12px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .a-in:disabled {
+    background: var(--color-bg);
+    color: var(--color-muted);
+  }
+  /* Save stays in reach at the bottom of the screen. */
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 0;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-line);
+  }
+  @media (max-width: 799px) {
+    .save-bar {
+      bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    }
+    .save-bar .a-btn {
+      width: 100%;
+      min-height: 50px;
+    }
+  }
+</style>

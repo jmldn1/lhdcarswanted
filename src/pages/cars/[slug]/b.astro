@@ -12,7 +12,7 @@ import Base from "../../../layouts/Base.astro";
 import CarPhoto from "../../../components/CarPhoto.astro";
 import CarCard from "../../../components/CarCard.astro";
 import { brand } from "../../../brands/index.ts";
-import { getCar, listCars, specsLine, priceLabel, makeSlug, nice } from "../../../lib/cars.ts";
+import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../../../lib/cars.ts";
 import { lightboxJson } from "../../../lib/lightbox.ts";
 import { readEnquiryForm, saveEnquiry, DIAL_CODES, type Enquiry, type EnquiryErrors } from "../../../lib/leads.ts";
 
@@ -45,12 +45,7 @@ if (Astro.request.method === "POST") {
 }
 const sent = Astro.url.searchParams.get("sent") === "1";
 
-const facts = [
-  ["Year", car.year],
-  ["Mileage", car.mileage],
-  ["Colour", car.colour && nice(car.colour)],
-  ["Registered", car.registered && nice(car.registered)],
-].filter((f): f is [string, string] => Boolean(f[1]));
+const facts = carFacts(car);
 const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== "sold").slice(0, 2);
 const sales = brand.contact.phones[0];
 const whatsapp = brand.contact.whatsapp

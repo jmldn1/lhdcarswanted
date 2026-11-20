@@ -1,0 +1,350 @@
+---
+// Admin: leads. Sell requests and enquiries, newest first, with one open
+// beside the list (on phones, the list or the one open). Each has a stage
+// and private notes, saved beside the request (src/lib/leads.ts).
+import Admin from "../../../layouts/Admin.astro";
+import { listLeads, getLead, saveLeadAdmin, STAGES, LEAD_KINDS, type LeadKind } from "../../../lib/leads.ts";
+
+const kindParam = Astro.url.searchParams.get("kind");
+const kind: LeadKind = LEAD_KINDS.includes(kindParam as LeadKind) ? (kindParam as LeadKind) : "sell";
+const idParam = Astro.url.searchParams.get("id") ?? "";
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const ok = await saveLeadAdmin(kind, idParam, {
+    stage: String(form.get("stage") ?? "New"),
+    notes: String(form.get("notes") ?? ""),
+  });
+  if (ok) return Astro.redirect(`/admin/leads?kind=${kind}&id=${idParam}&saved=1`, 303);
+}
+
+const [sell, enquiries] = await Promise.all([listLeads("sell"), listLeads("enquiries")]);
+const leads = kind === "sell" ? sell : enquiries;
+const open = idParam ? await getLead(kind, idParam) : null;
+const saved = Astro.url.searchParams.get("saved") === "1";
+const fresh = (l: typeof sell) => l.filter((x) => x.admin.stage === "New").length;
+
+const s = (v: unknown) => (v === undefined || v === null ? "" : String(v));
+const when = (iso: string) =>
+  iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const title = (l: { kind: LeadKind; request: Record<string, unknown> }) => {
+  const r = l.request;
+  if (l.kind === "enquiries") return s((r.car as { name?: string } | undefined)?.name) || "Enquiry";
+  return [r.year, r.make, r.model].map(s).filter(Boolean).join(" ") || "Sell request";
+};
+
+const r = open?.request ?? {};
+const phone = s(r.phone);
+const email = s(r.email);
+const digits = phone.replace(/\D/g, "");
+const facts: [string, string][] = open
+  ? open.kind === "sell"
+    ? [
+        ["Reg or VIN", s(r.reg) || "Not given"],
+        ["Mileage", r.mileage ? `${s(r.mileage)} ${s(r.unit)}` : "Not given"],
+        ["Registered", s(r.registered)],
+        ["Steering", s(r.drive)],
+        ["Name", s(r.name)],
+        ["Phone", phone || "Not given"],
+        ["Email", email],
+      ]
+    : [
+        ["Car", title(open)],
+        ["Name", s(r.name)],
+        ["Phone", phone || "Not given"],
+        ["Email", email],
+      ]
+  : [];
+const photos = open?.kind === "sell" && Array.isArray(r.photos) ? (r.photos as string[]) : [];
+const carUrl = open?.kind === "enquiries" ? s((r.car as { url?: string } | undefined)?.url) : "";
+const viewable = (f: string) => /\.(jpg|png|webp|avif)$/.test(f);
+---
+
+<Admin title="Leads" active="leads">
+  <div class:list={["page", { "has-open": Boolean(open) }]}>
+    <h1 class="admin-h1">Leads</h1>
+    <nav class="tabs" aria-label="Lead type">
+      <a href="/admin/leads?kind=sell" aria-current={kind === "sell" ? "page" : undefined}>Sell requests{fresh(sell) > 0 && ` (${fresh(sell)} new)`}</a>
+      <a href="/admin/leads?kind=enquiries" aria-current={kind === "enquiries" ? "page" : undefined}>Enquiries{fresh(enquiries) > 0 && ` (${fresh(enquiries)} new)`}</a>
+    </nav>
+
+    <div class="split">
+      <ul class="list">
+        {leads.length === 0 && <li class="none">None yet.</li>}
+        {leads.map((l) => (
+          <li>
+            <a href={`/admin/leads?kind=${kind}&id=${l.id}`} aria-current={open?.id === l.id ? "true" : undefined}>
+              <strong>{title(l)}</strong>
+              <span>{s(l.request.name)}</span>
+              <span class="muted">{when(l.receivedAt)}</span>
+              {l.admin.stage === "New" ? <span class="new">New</span> : <span class="stage">{l.admin.stage}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {open ? (
+        <section class="admin-box detail" aria-labelledby="lead-h">
+          <a class="back" href={`/admin/leads?kind=${kind}`}>All {kind === "sell" ? "sell requests" : "enquiries"}</a>
+          <div class="d-head">
+            <div>
+              <div class="k">{kind === "sell" ? "Sell request" : "Enquiry"} · {when(open.receivedAt)}</div>
+              <h2 id="lead-h">{title(open)}</h2>
+            </div>
+            <div class="acts">
+              {phone && <a class="a-btn pri" href={`tel:${phone.replace(/\s/g, "")}`}>Call</a>}
+              {digits && <a class="a-btn" href={`https://wa.me/${digits}`} target="_blank" rel="noopener">WhatsApp</a>}
+              {email && <a class="a-btn" href={`mailto:${email}?subject=${encodeURIComponent(`Your ${title(open)}`)}`}>Email</a>}
+            </div>
+          </div>
+          {saved && <p class="a-note" role="status">Saved.</p>}
+
+          <dl class="facts">
+            {facts.map(([k, v]) => <div><dt class="k">{k}</dt><dd>{v}</dd></div>)}
+          </dl>
+          {carUrl && <p class="carlink"><a href={carUrl} target="_blank" rel="noopener">See the car's page</a></p>}
+
+          {s(r.message) && (
+            <div>
+              <div class="k">Message</div>
+              <p class="msg">{s(r.message)}</p>
+            </div>
+          )}
+
+          {photos.length > 0 && (
+            <div>
+              <div class="k">Photos sent · {photos.length}</div>
+              <ul class="shots">
+                {photos.map((f) => {
+                  const url = `/admin/leads/photo?kind=${kind}&id=${open.id}&file=${encodeURIComponent(f)}`;
+                  return (
+                    <li>
+                      <a href={url} target="_blank" rel="noopener">
+                        {viewable(f) ? <img src={url} alt={`Photo ${f}`} loading="lazy" /> : <span class="file">{f}<br />Download</span>}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <form method="post" class="track">
+            <fieldset>
+              <legend class="k">Where it's at</legend>
+              <div class="a-pills">
+                {STAGES[kind].map((st) => (
+                  <label class="a-pill"><input type="radio" name="stage" value={st} checked={open.admin.stage === st} /><span>{st}</span></label>
+                ))}
+              </div>
+            </fieldset>
+            <div>
+              <label class="k" for="notes">Notes (only you see these)</label>
+              <textarea class="a-in" id="notes" name="notes" rows="4">{open.admin.notes}</textarea>
+            </div>
+            <button class="a-btn pri" type="submit">Save</button>
+          </form>
+        </section>
+      ) : (
+        leads.length > 0 && <p class="pick">Choose one to see it here.</p>
+      )}
+    </div>
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 1200px;
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .tabs a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 12px;
+    border-bottom: 3px solid transparent;
+    color: var(--color-muted);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .tabs a[aria-current="page"] {
+    color: var(--color-fg);
+    border-bottom-color: var(--color-accent);
+  }
+  .split {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .list {
+    flex: 1 1 280px;
+    max-width: 380px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .list li + li {
+    border-top: 1px solid var(--color-line);
+  }
+  .list a {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    padding-right: 96px;
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+  .list a:hover {
+    background: var(--color-bg);
+  }
+  .list a[aria-current="true"] {
+    background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  }
+  .none {
+    padding: 20px 16px;
+    color: var(--color-muted);
+  }
+  .muted {
+    color: var(--color-muted);
+    font-size: 13px;
+  }
+  .new,
+  .stage {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    padding: 2px 8px;
+    font: 700 12px/1.4 var(--font-body);
+  }
+  .new {
+    background: #fdf0d5;
+    color: #7a4b00;
+  }
+  .stage {
+    background: var(--color-bg);
+    color: var(--color-muted);
+  }
+  .detail {
+    flex: 999 1 480px;
+    min-width: 0;
+  }
+  .back {
+    display: none;
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .d-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .d-head h2 {
+    font: 700 30px/1.05 var(--font-display);
+    margin: 4px 0 0;
+  }
+  .acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .k {
+    display: block;
+    font: 700 12px/1.3 var(--font-body);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 14px 20px;
+    margin: 0;
+  }
+  .facts dd {
+    margin: 2px 0 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .carlink,
+  .msg {
+    margin: 4px 0 0;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .shots {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .shots a {
+    display: block;
+    aspect-ratio: 4 / 3;
+    background: var(--color-line);
+  }
+  .shots img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .file {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    font-size: 13px;
+    text-align: center;
+  }
+  .track {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .track > div {
+    width: 100%;
+  }
+  .track .a-in {
+    margin-top: 8px;
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  fieldset .a-pills {
+    margin-top: 8px;
+  }
+  .pick {
+    color: var(--color-muted);
+  }
+  /* Phones: the list, or the one open with a link back. */
+  @media (max-width: 799px) {
+    .list {
+      max-width: none;
+    }
+    .has-open .list,
+    .pick {
+      display: none;
+    }
+    .back {
+      display: block;
+    }
+  }
+</style>
