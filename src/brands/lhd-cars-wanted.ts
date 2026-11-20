@@ -64,6 +64,26 @@ export const lhdCarsWanted: Brand = {
       ],
       thanks: "[We'll reply within REPLY TIME] by email, or by phone if you gave us a number.",
     },
+    about: {
+      heading: "Left hand drive cars, bought and sold",
+      intro: "[Who we are, in one or two sentences: who runs it, since when, where.]",
+      stats: [
+        { value: "[Years]", label: "[years buying and selling LHD cars]" },
+        { value: "[Number]", label: "[cars bought]" },
+        { value: "[Rating]", label: "[from Google reviews]" },
+      ],
+      // The confirmed sell band wording.
+      buy: "Free valuation and top cash prices paid. Outstanding finance settled, secure payment and free UK collection.",
+      sell: "[What you sell: the kind of cars, how they're prepared, viewings.]",
+      story: ["[How it started.]", "[Why left hand drive cars.]", "[What sellers and buyers can expect from you.]"],
+      reviews: [
+        { text: "[A real review, from Google]", name: "[Name]" },
+        { text: "[A real review, from Google]", name: "[Name]" },
+        { text: "[A real review, from Google]", name: "[Name]" },
+      ],
+    },
+    blogIntro: "[Blog intro: what you write about, in a sentence or two]",
+    contactIntro: "Call, WhatsApp or email us, or send a message below. [We usually reply within REPLY TIME.]",
   },
   cardPhoto: { fit: "contain", ratio: "3 / 2" },
 };

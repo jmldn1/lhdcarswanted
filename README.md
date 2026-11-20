@@ -53,10 +53,11 @@ Clone it anywhere outside this project, then:
 npm run stock:import-mercury -- <mercury>/public/images
 ```
 
-**Windows:** start the dev server from a path with a capital drive letter
-(`C:\Users\...`, not `c:\Users\...`). Otherwise Astro hashes the two
-spellings differently and every component's scoped styles silently stop
-applying in dev. The production build isn't affected.
+**Windows:** run the dev server *and* `npm run build` from a path with a
+capital drive letter (`C:\Users\...`, not `c:\Users\...`; VS Code's terminal
+often opens at `c:`). Otherwise Astro hashes the two spellings differently:
+in dev, components' styles silently stop applying; in a build, no page gets
+its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 
 ## Where things are
 
@@ -81,6 +82,11 @@ applying in dev. The production build isn't affected.
   brand file (`copy.sell`).
 - `src/pages/cars/`: /cars (grid, quick look, `?make=` filter) and the car page
   (layout A; `/cars/<car>/b` is layout B with an enquiry form, to compare).
+- `src/pages/blog/`, `src/lib/blog.ts`: the blog. Posts are written in the
+  admin (/admin/blog) and kept in the database; their text uses a small, safe
+  formatting set (headings, lists, quotes, bold, italic, links).
+- `src/pages/about.astro`, `src/pages/contact.astro`: About (words from the
+  brand's `copy.about`) and Contact (its form saves to the leads' Messages).
 - `scripts/import-mercury-stock.ts`: test stock from mercury's photos.
 
 `data/` and `public/photos/` hold test stock and are git-ignored.

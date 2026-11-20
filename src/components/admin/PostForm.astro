@@ -1,0 +1,210 @@
+---
+// The admin's write/edit post form: title, category, intro, the post (with
+// a short formatting guide), cover photo, author, date and Draft/Published.
+import type { Post } from "../../lib/blog.ts";
+import type { PostErrors } from "../../lib/post-form.ts";
+import { pick } from "../../lib/photos.ts";
+
+interface Props {
+  post: Post;
+  errors: PostErrors;
+  categories: string[];
+  mode: "new" | "edit";
+}
+const { post, errors, categories, mode } = Astro.props;
+const err = (k: keyof PostErrors) => errors[k];
+---
+
+<form method="post" enctype="multipart/form-data" class="post-form" novalidate>
+  <input type="hidden" name="intent" value="save" />
+  <div class="cols">
+    <div class="col-main">
+      <section class="admin-box" aria-labelledby="w-h">
+        <h2 id="w-h">The post</h2>
+        <div>
+          <label class="a-lbl" for="p-title">Title</label>
+          <input class="a-in big" id="p-title" name="title" value={post.title} required aria-invalid={err("title") ? "true" : undefined} aria-describedby={err("title") ? "p-title-err" : undefined} />
+          {err("title") && <p class="a-err" id="p-title-err">{err("title")}</p>}
+        </div>
+        <div>
+          <label class="a-lbl" for="p-intro">Intro <span class="a-opt">(one sentence, under the title and on the blog page)</span></label>
+          <textarea class="a-in" id="p-intro" name="intro" rows="2">{post.intro}</textarea>
+        </div>
+        <div>
+          <label class="a-lbl" for="p-body">The post</label>
+          <textarea class="a-in body" id="p-body" name="body" rows="22" aria-invalid={err("body") ? "true" : undefined} aria-describedby={`p-help${err("body") ? " p-body-err" : ""}`}>{post.body}</textarea>
+          {err("body") && <p class="a-err" id="p-body-err">{err("body")}</p>}
+          <details class="help" id="p-help">
+            <summary>Formatting</summary>
+            <ul>
+              <li>Leave an empty line between paragraphs.</li>
+              <li><code>## A heading</code>, <code>### A smaller heading</code></li>
+              <li><code>- a point</code> on each line for a list, <code>1. a step</code> for a numbered one</li>
+              <li><code>&gt; a line to pull out</code> for a quote</li>
+              <li><code>**bold**</code>, <code>_italic_</code>, <code>[link text](https://…)</code></li>
+            </ul>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-side">
+      <section class="admin-box" aria-labelledby="pub-h">
+        <h2 id="pub-h">Publishing</h2>
+        <fieldset>
+          <legend class="sr">Status</legend>
+          <div class="a-pills">
+            <label class="a-pill"><input type="radio" name="status" value="draft" checked={post.status === "draft"} /><span>Draft</span></label>
+            <label class="a-pill"><input type="radio" name="status" value="published" checked={post.status === "published"} /><span>Published</span></label>
+          </div>
+          <p class="a-hint">Drafts are only seen here.</p>
+        </fieldset>
+        <div>
+          <label class="a-lbl" for="p-date">Date shown</label>
+          <input class="a-in" id="p-date" name="date" type="date" value={post.date} aria-invalid={err("date") ? "true" : undefined} />
+          {err("date") && <p class="a-err">{err("date")}</p>}
+        </div>
+        <div>
+          <label class="a-lbl" for="p-cat">Category <span class="a-opt">(optional)</span></label>
+          <input class="a-in" id="p-cat" name="category" list="p-cats" value={post.category} placeholder="Selling, Buying…" />
+          <datalist id="p-cats">{categories.map((c) => <option value={c} />)}</datalist>
+        </div>
+        <div>
+          <label class="a-lbl" for="p-author">Author <span class="a-opt">(optional)</span></label>
+          <input class="a-in" id="p-author" name="author" value={post.author} />
+        </div>
+        {post.slug && (
+          <div>
+            <span class="a-lbl">Web address</span>
+            <p class="addr">/blog/{post.slug}</p>
+          </div>
+        )}
+      </section>
+
+      <section class="admin-box" aria-labelledby="cov-h">
+        <h2 id="cov-h">Cover photo</h2>
+        {post.cover && (
+          <>
+            <img class="cover" src={pick(post.cover.avif, 800).url} alt="The current cover photo" />
+            <label class="check"><input type="checkbox" name="removeCover" /> Remove this photo</label>
+          </>
+        )}
+        <div>
+          <label class="a-lbl" for="p-cover">{post.cover ? "Replace it" : "Choose a photo"}</label>
+          <input id="p-cover" name="cover" type="file" accept="image/*" />
+          {err("cover") && <p class="a-err">{err("cover")}</p>}
+          <p class="a-hint">Shown wide (16:9) at the top of the post and on its card.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="a-btn pri" type="submit">{mode === "new" ? "Save the post" : "Save changes"}</button>
+  </div>
+</form>
+
+<style>
+  .post-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .col-main {
+    flex: 999 1 520px;
+    min-width: 0;
+  }
+  .col-side {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .big {
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .body {
+    font: 400 16px/1.6 var(--font-body);
+  }
+  .help {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .help summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .help ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+  .help code {
+    background: var(--color-bg);
+    padding: 1px 4px;
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .addr {
+    margin: 0;
+    padding: 12px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line);
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    display: block;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 0;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-line);
+  }
+  @media (max-width: 799px) {
+    .save-bar {
+      bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    }
+    .save-bar .a-btn {
+      width: 100%;
+      min-height: 50px;
+    }
+  }
+</style>

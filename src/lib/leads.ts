@@ -80,7 +80,7 @@ const EXT: Record<string, string> = {
 };
 
 /** A new, empty folder for one request: LEADS_DIR/<kind>/<date>-<random>. */
-async function newLeadDir(kind: "sell" | "enquiries") {
+async function newLeadDir(kind: LeadKind) {
   const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomBytes(6).toString("hex")}`;
   const dir = path.join(process.env.LEADS_DIR || path.resolve("data/leads"), kind, id);
   await fs.mkdir(dir, { recursive: true });
@@ -138,14 +138,51 @@ export async function saveEnquiry(data: Enquiry, car: { id: string; name: string
   return id;
 }
 
+/** A message from the Contact page. */
+export interface Message {
+  topic: "Buying a car" | "Selling my car" | "Something else";
+  name: string;
+  email: string;
+  dial: string;
+  phone: string;
+  message: string;
+}
+export type MessageErrors = Partial<Record<keyof Message, string>>;
+export const TOPICS: Message["topic"][] = ["Buying a car", "Selling my car", "Something else"];
+
+export function readMessageForm(form: FormData): { data: Message; errors: MessageErrors } {
+  const data: Message = {
+    topic: oneOf(text(form, "topic"), TOPICS, "Something else"),
+    name: text(form, "name", 100),
+    email: text(form, "email", 200),
+    dial: oneOf(text(form, "dial"), DIALS, "+44"),
+    phone: text(form, "phone", 40),
+    message: text(form, "message", 4000),
+  };
+  const errors: MessageErrors = {};
+  if (!data.name) errors.name = "Enter your name";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = "Enter an email address like you@example.com";
+  if (data.phone && !/^[\d\s()+-]{6,}$/.test(data.phone)) errors.phone = "Enter a phone number, or leave it blank";
+  if (!data.message) errors.message = "Enter a message";
+  return { data, errors };
+}
+
+export async function saveMessage(data: Message): Promise<string> {
+  const { id, dir } = await newLeadDir("messages");
+  const record = { id, receivedAt: new Date().toISOString(), ...data, phone: fullPhone(data.dial, data.phone) };
+  await fs.writeFile(path.join(dir, "request.json"), JSON.stringify(record, null, 2));
+  return id;
+}
+
 // The admin's side: reading leads, and each lead's stage and notes, kept in
 // admin.json beside request.json (which is never changed).
 
-export type LeadKind = "sell" | "enquiries";
-export const LEAD_KINDS: LeadKind[] = ["sell", "enquiries"];
+export type LeadKind = "sell" | "enquiries" | "messages";
+export const LEAD_KINDS: LeadKind[] = ["sell", "enquiries", "messages"];
 export const STAGES: Record<LeadKind, string[]> = {
   sell: ["New", "Contacted", "Offer made", "Bought", "Not going ahead"],
   enquiries: ["New", "Replied", "Viewing booked", "Sold", "Closed"],
+  messages: ["New", "Replied", "Closed"],
 };
 
 export interface LeadAdmin {

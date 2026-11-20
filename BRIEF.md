@@ -91,6 +91,14 @@ site. Started 18 November 2026.
    enquiries, with a stage and notes). Cars are in this site's own MongoDB
    database (`lhdcarswanted`); leads stay as files in `LEADS_DIR`. Not built
    yet: cars wanted, homepage photos (hero choice and focus) and settings.
+7. Blog, About and Contact: built 20 Nov 2026 from the mockups
+   (https://claude.ai/artifact/313rhG5NV8wtcR9D6iDMHQ). Posts are written in
+   the admin (Blog) and kept in the database; Contact messages go to the
+   admin's Leads (Messages). The menu gains Blog, About and Contact, behind
+   a Menu button on phones. **Waiting on the client:** the About words
+   (who, story, numbers, what you sell), real Google reviews, reply time,
+   address and opening hours (then a map), and the blog's first posts.
+   Not built yet: photos inside a post (only a cover), the privacy page.
 5. ~~Sell your car form~~ Built 18 Nov 2026 at /sell-your-car from the mockup
    (https://claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv), to be refined. It
    saves each request to `LEADS_DIR`; still to do: email each one to the

@@ -1,0 +1,260 @@
+---
+// About, from the blog/about/contact mockups. Every word comes from the
+// brand (copy.about; the selling steps from copy.sell). Off when the brand
+// has no About copy. Photos: the featured car's, as on the homepage.
+import Base from "../layouts/Base.astro";
+import CarPhoto from "../components/CarPhoto.astro";
+import SellBand from "../components/SellBand.astro";
+import { brand } from "../brands/index.ts";
+import { listCars } from "../lib/cars.ts";
+import { getSitePhotos } from "../lib/site.ts";
+
+const about = brand.copy.about;
+if (!about) return new Response(null, { status: 404 });
+const steps = brand.features.sellForm ? brand.copy.sell?.steps ?? [] : [];
+
+const cars = await listCars();
+const site = await getSitePhotos();
+const withPhotos = cars.filter((c) => c.photos.length);
+const lead = withPhotos.find((c) => c.slug === site.featured) ?? withPhotos[0];
+const second = withPhotos.find((c) => c !== lead);
+---
+
+<Base title="About us" description={about.intro} flush>
+  <main class="page">
+    <section class="wrap split">
+      <div class="lead">
+        <span class="eyebrow">About us</span>
+        <h1>{about.heading}</h1>
+        <p class="big">{about.intro}</p>
+        <div class="btns">
+          {brand.features.sellForm && <a class="btn btn-primary b" href="/sell-your-car">Sell your car</a>}
+          <a class="btn b" href="/cars">See our cars</a>
+        </div>
+      </div>
+      {lead && (
+        <div class="pic">
+          <CarPhoto photo={lead.photos[0]} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={`${lead.make} ${lead.model}`} />
+        </div>
+      )}
+    </section>
+
+    {about.stats.length > 0 && (
+      <section class="wrap" aria-label="In numbers">
+        <dl class="stats">
+          {about.stats.map((s) => <div><dt>{s.label}</dt><dd>{s.value}</dd></div>)}
+        </dl>
+      </section>
+    )}
+
+    <section class="wrap" aria-labelledby="do-h">
+      <h2 id="do-h">What we do</h2>
+      <div class="do">
+        <div class="card">
+          <h3>We buy left hand drive cars</h3>
+          <p>{about.buy}</p>
+          {brand.features.sellForm && <a href="/sell-your-car">Get a free valuation</a>}
+        </div>
+        <div class="card">
+          <h3>We sell left hand drive cars</h3>
+          <p>{about.sell}</p>
+          <a href="/cars">See the cars we have</a>
+        </div>
+      </div>
+    </section>
+
+    {about.story.length > 0 && (
+      <section class="wrap split" aria-labelledby="story-h">
+        {second && (
+          <div class="pic">
+            <CarPhoto photo={second.photos[0]} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={`${second.make} ${second.model}`} />
+          </div>
+        )}
+        <div class="story">
+          <h2 id="story-h">Our story</h2>
+          {about.story.map((p) => <p>{p}</p>)}
+        </div>
+      </section>
+    )}
+
+    {steps.length > 0 && (
+      <section class="wrap" aria-labelledby="how-h">
+        <h2 id="how-h">Selling your car to us</h2>
+        <ol class="steps">
+          {steps.map((s, i) => (
+            <li class="card">
+              <span class="num" aria-hidden="true">{i + 1}</span>
+              <h3>{s.title}</h3>
+              <p>{s.text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
+
+    {about.reviews.length > 0 && (
+      <section class="wrap" aria-labelledby="rev-h">
+        <h2 id="rev-h">What customers say</h2>
+        <div class="reviews">
+          {about.reviews.map((r) => (
+            <figure class="card">
+              <blockquote>{r.text}</blockquote>
+              <figcaption>{r.name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+    )}
+  </main>
+  <SellBand second={{ href: "/contact", label: "Contact us" }} />
+</Base>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+    padding-block: 48px 72px;
+  }
+  /* Full width: in a flex column, .wrap's auto margins would shrink it. */
+  .page > .wrap {
+    width: 100%;
+  }
+  .split {
+    display: grid;
+    gap: 32px 48px;
+    align-items: center;
+  }
+  @media (min-width: 960px) {
+    .split {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+  .lead {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  h1 {
+    font: 700 clamp(40px, 5.5vw, 60px)/1.02 var(--font-display);
+    margin: 0;
+  }
+  h2 {
+    font: 700 clamp(32px, 4vw, 40px)/1.05 var(--font-display);
+    margin: 0 0 24px;
+  }
+  h3 {
+    font: 700 28px/1.1 var(--font-display);
+    margin: 0;
+  }
+  .big {
+    margin: 0;
+    font-size: 20px;
+  }
+  .btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .b {
+    min-height: 50px;
+    font-weight: 700;
+    border-width: 1.5px;
+  }
+  .pic {
+    aspect-ratio: 4 / 3;
+    background: var(--color-line);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .stats div {
+    display: flex;
+    flex-direction: column-reverse;
+    padding: 22px 24px;
+    border-right: 1px solid var(--color-line);
+    margin-right: -1px;
+  }
+  .stats dd {
+    margin: 0;
+    font: 700 40px/1 var(--font-display);
+  }
+  .stats dt {
+    margin-top: 4px;
+  }
+  .do,
+  .reviews {
+    display: grid;
+    gap: 24px;
+  }
+  @media (min-width: 760px) {
+    .do {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .reviews {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 26px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .card p {
+    margin: 0;
+    font-size: 17px;
+  }
+  .card a {
+    margin-top: auto;
+    font-weight: 700;
+  }
+  .story {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .story h2 {
+    margin: 0;
+  }
+  .story p {
+    margin: 0;
+    font-size: 18px;
+  }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 24px;
+  }
+  @media (min-width: 960px) {
+    .steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .num {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    background: var(--color-fg);
+    color: var(--color-surface);
+    font: 700 20px/1 var(--font-display);
+  }
+  blockquote {
+    margin: 0;
+    font-size: 17px;
+  }
+  figcaption {
+    font-weight: 700;
+  }
+</style>

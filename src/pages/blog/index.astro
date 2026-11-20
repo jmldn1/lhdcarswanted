@@ -1,0 +1,209 @@
+---
+// The blog, from the blog/about/contact mockups: the newest post large, the
+// rest in a grid, filtered by category (?category=, plain links). Posts are
+// written in the admin. Off when the brand has no blog.
+import Base from "../../layouts/Base.astro";
+import CarPhoto from "../../components/CarPhoto.astro";
+import SellBand from "../../components/SellBand.astro";
+import { brand } from "../../brands/index.ts";
+import { listPosts, categories, readMinutes, postDate } from "../../lib/blog.ts";
+import { makeSlug } from "../../lib/cars.ts";
+
+if (!brand.features.blog) return new Response(null, { status: 404 });
+
+const all = await listPosts();
+const cats = categories(all);
+const picked = cats.find((c) => c.slug === Astro.url.searchParams.get("category"));
+const shown = picked ? all.filter((p) => makeSlug(p.category) === picked.slug) : all;
+const [first, ...rest] = shown;
+const meta = (p: (typeof all)[number]) => [postDate(p.date), `${readMinutes(p.body)} min read`].filter(Boolean).join(" · ");
+---
+
+<Base title="Blog" description={brand.copy.blogIntro?.startsWith("[") ? `News and guides from ${brand.name}.` : brand.copy.blogIntro} flush>
+  <main class="wrap page">
+    <div class="intro">
+      <h1>Blog</h1>
+      {brand.copy.blogIntro && <p>{brand.copy.blogIntro}</p>}
+    </div>
+
+    {cats.length > 1 && (
+      <nav class="chips" aria-label="Show posts about">
+        <a href="/blog" aria-current={!picked ? "page" : undefined}>All</a>
+        {cats.map((c) => <a href={`/blog?category=${c.slug}`} aria-current={picked?.slug === c.slug ? "page" : undefined}>{c.name}</a>)}
+      </nav>
+    )}
+
+    {!first && <p class="empty">No posts yet.</p>}
+
+    {first && (
+      <a class="feat" href={`/blog/${first.slug}`}>
+        <div class="feat-pic">
+          {first.cover && <CarPhoto photo={first.cover} fit="cover" priority sizes="(min-width: 960px) 700px, calc(100vw - 32px)" alt="" />}
+        </div>
+        <div class="feat-text">
+          <span class="eyebrow">{picked ? first.category : `Latest${first.category ? ` · ${first.category}` : ""}`}</span>
+          <h2>{first.title}</h2>
+          {first.intro && <p>{first.intro}</p>}
+          <span class="meta">{meta(first)}</span>
+          <span class="go">Read the post</span>
+        </div>
+      </a>
+    )}
+
+    {rest.length > 0 && (
+      <ul class="grid">
+        {rest.map((p) => (
+          <li>
+            <a class="card" href={`/blog/${p.slug}`}>
+              <div class="card-pic">
+                {p.cover && <CarPhoto photo={p.cover} fit="cover" sizes="(min-width: 1240px) 380px, (min-width: 900px) 30vw, (min-width: 600px) 45vw, calc(100vw - 32px)" alt="" />}
+              </div>
+              <div class="card-text">
+                {p.category && <span class="eyebrow">{p.category}</span>}
+                <h3>{p.title}</h3>
+                {p.intro && <p>{p.intro}</p>}
+                <span class="meta">{meta(p)}</span>
+              </div>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </main>
+  <SellBand />
+</Base>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding-block: 44px 72px;
+  }
+  .intro {
+    max-width: 760px;
+  }
+  h1 {
+    font: 700 clamp(42px, 6vw, 60px)/1.02 var(--font-display);
+    margin: 0;
+  }
+  .intro p {
+    margin: 12px 0 0;
+    font-size: 19px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chips a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    padding: 0 16px;
+    border: 1px solid var(--color-muted);
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .chips a[aria-current="page"] {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .empty {
+    margin: 0;
+    color: var(--color-muted);
+  }
+  .feat {
+    display: grid;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+  @media (min-width: 900px) {
+    .feat {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+  }
+  .feat-pic,
+  .card-pic {
+    aspect-ratio: 16 / 9;
+    background: var(--color-line);
+  }
+  @media (min-width: 900px) {
+    .feat-pic {
+      aspect-ratio: auto;
+      min-height: 340px;
+    }
+  }
+  .feat-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+  }
+  .feat h2 {
+    font: 700 clamp(30px, 3.4vw, 40px)/1.05 var(--font-display);
+    margin: 0;
+  }
+  .feat p,
+  .card p {
+    margin: 0;
+  }
+  .feat p {
+    font-size: 17px;
+  }
+  .meta {
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .go {
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 24px;
+  }
+  @media (min-width: 600px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+  .card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px 22px;
+  }
+  .card h3 {
+    font: 700 26px/1.1 var(--font-display);
+    margin: 0;
+  }
+  .feat:hover h2,
+  .card:hover h3 {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+</style>

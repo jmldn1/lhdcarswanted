@@ -26,6 +26,22 @@ export interface Phone {
 }
 
 /** The sell your car page's words. */
+/** The About page's words (the selling steps come from SellCopy). */
+export interface AboutCopy {
+  heading: string;
+  intro: string;
+  /** Up to three numbers, e.g. { value: "15", label: "years buying LHD cars" }. */
+  stats: { value: string; label: string }[];
+  /** "We buy left hand drive cars" text. */
+  buy: string;
+  /** "We sell left hand drive cars" text. */
+  sell: string;
+  /** Paragraphs of "Our story". */
+  story: string[];
+  /** Real reviews only. */
+  reviews: { text: string; name: string }[];
+}
+
 export interface SellCopy {
   /** The homepage's sell band. */
   bandHeading: string;
@@ -76,6 +92,12 @@ export interface Brand {
     carsEmpty: string;
     /** /sell-your-car; needed when features.sellForm is on. */
     sell?: SellCopy;
+    /** /about; the page is off without it. */
+    about?: AboutCopy;
+    /** Under the /blog heading. */
+    blogIntro?: string;
+    /** Under the /contact heading. */
+    contactIntro?: string;
   };
   /**
    * How car photos sit in the /cars grid frame. "contain" shows the whole

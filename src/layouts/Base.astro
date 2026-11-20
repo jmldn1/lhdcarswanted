@@ -20,8 +20,10 @@ interface Props {
   description?: string;
   /** Keep the page out of search engines (layouts being compared, etc.). */
   noindex?: boolean;
+  /** The page ends in a full-width band: no gap above the footer. */
+  flush?: boolean;
 }
-const { title, description, noindex = false } = Astro.props;
+const { title, description, noindex = false, flush = false } = Astro.props;
 const path = Astro.url.pathname;
 const sales = brand.contact.phones[0];
 ---
@@ -37,6 +39,7 @@ const sales = brand.contact.phones[0];
     <link rel="icon" href={icon} />
     {preloadFonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
     <style is:inline set:html={brandCss()}></style>
+    <script is:inline>document.documentElement.classList.add("js");</script>
   </head>
   <body>
     <header class="site-head">
@@ -45,11 +48,19 @@ const sales = brand.contact.phones[0];
           <span class="top">{brand.logo.top}</span>
           <span class="bottom">{brand.logo.bottom}</span>
         </a>
-        <nav aria-label="Main">
+        <!-- Shown only on phones with scripts running (CSS below). -->
+        <button class="menu-btn" type="button" aria-expanded="false" aria-controls="main-nav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          Menu
+        </button>
+        <nav id="main-nav" aria-label="Main">
           <a href="/cars" aria-current={path.startsWith("/cars") ? "page" : undefined}>Cars</a>
           {brand.features.sellForm && (
             <a href="/sell-your-car" aria-current={path === "/sell-your-car" ? "page" : undefined}>Sell your car</a>
           )}
+          {brand.features.blog && <a href="/blog" aria-current={path.startsWith("/blog") ? "page" : undefined}>Blog</a>}
+          {brand.copy.about && <a href="/about" aria-current={path === "/about" ? "page" : undefined}>About</a>}
+          <a href="/contact" aria-current={path === "/contact" ? "page" : undefined}>Contact</a>
           {sales && <a class="tel" href={`tel:${sales.tel}`}>{sales.display}</a>}
         </nav>
       </div>
@@ -57,7 +68,7 @@ const sales = brand.contact.phones[0];
 
     <slot />
 
-    <footer class="site-foot">
+    <footer class:list={["site-foot", { flush }]}>
       <div class="wrap cols">
         <div>
           <div class="eyebrow">{brand.name}</div>
@@ -74,6 +85,16 @@ const sales = brand.contact.phones[0];
     </footer>
   </body>
 </html>
+
+<script>
+  // Phones: the Menu button opens and closes the links.
+  const btn = document.querySelector<HTMLButtonElement>(".menu-btn");
+  const nav = document.getElementById("main-nav");
+  btn?.addEventListener("click", () => {
+    const open = nav?.classList.toggle("open") ?? false;
+    btn.setAttribute("aria-expanded", String(open));
+  });
+</script>
 
 <style>
   .site-head {
@@ -104,9 +125,60 @@ const sales = brand.contact.phones[0];
   }
   nav {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 20px;
     align-items: center;
     font-weight: 600;
+  }
+  .menu-btn {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font: 600 15px/1 var(--font-body);
+    cursor: pointer;
+  }
+  .menu-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  /* Phones (with scripts): the links behind a Menu button, opening as a list
+     under the bar. Without scripts they simply wrap. */
+  @media (max-width: 899px) {
+    :global(.js) .menu-btn {
+      display: inline-flex;
+    }
+    :global(.js) .bar {
+      flex-wrap: wrap;
+    }
+    :global(.js) nav {
+      display: none;
+      flex-basis: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      padding-bottom: 8px;
+    }
+    :global(.js) nav.open {
+      display: flex;
+    }
+    :global(.js) nav a {
+      padding-block: 12px;
+      border-bottom: 1px solid var(--color-line);
+    }
+    :global(.js) nav a[aria-current="page"] {
+      border-bottom-color: var(--color-line);
+      color: var(--color-accent);
+    }
   }
   nav a {
     color: var(--color-fg);
@@ -119,6 +191,9 @@ const sales = brand.contact.phones[0];
   }
   nav .tel {
     font-variant-numeric: tabular-nums;
+  }
+  .site-foot.flush {
+    margin-top: 0;
   }
   .site-foot {
     margin-top: 64px;

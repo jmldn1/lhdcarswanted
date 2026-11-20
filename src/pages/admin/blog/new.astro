@@ -1,0 +1,59 @@
+---
+// Admin: write a post. Saved as a draft unless Published is chosen.
+import Admin from "../../../layouts/Admin.astro";
+import PostForm from "../../../components/admin/PostForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { adminPosts, newPostId, savePost, uniquePostSlug, categories, type Post } from "../../../lib/blog.ts";
+import { readPostForm, today, type PostErrors } from "../../../lib/post-form.ts";
+import { applyCover } from "../../../lib/post-cover.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/blog", 303);
+
+let post: Post = { id: newPostId(), slug: "", title: "", category: "", intro: "", body: "", status: "draft", date: today() };
+let errors: PostErrors = {};
+
+if (Astro.request.method === "POST") {
+  if (Number(Astro.request.headers.get("content-length") ?? 0) > 40 * 1024 * 1024) {
+    errors = { cover: "That photo is too big (30 MB at most)." };
+  } else {
+    const form = await Astro.request.formData();
+    const read = readPostForm(form, post);
+    post = read.post;
+    errors = read.errors;
+    if (!Object.keys(errors).length) {
+      const withCover = await applyCover(form, post);
+      if (withCover.error) errors.cover = withCover.error;
+      else {
+        post = { ...withCover.post, slug: await uniquePostSlug(post.title) };
+        await savePost(post);
+        return Astro.redirect(`/admin/blog/${post.id}?saved=1`, 303);
+      }
+    }
+  }
+  Astro.response.status = 400;
+}
+const cats = categories(await adminPosts()).map((c) => c.name);
+---
+
+<Admin title="Write a post" active="blog">
+  <div class="page">
+    <div>
+      <a class="up" href="/admin/blog">Blog</a>
+      <h1 class="admin-h1">Write a post</h1>
+    </div>
+    <PostForm post={post} errors={errors} categories={cats} mode="new" />
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+</style>

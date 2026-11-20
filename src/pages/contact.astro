@@ -1,0 +1,350 @@
+---
+// Contact, from the blog/about/contact mockups: ways to get in touch, a
+// message form and where to find us. The form works without JavaScript: it
+// posts here, is saved as a lead (LEADS_DIR/messages, the admin's Messages
+// tab) and redirects to a thank-you. "Selling my car" points to the sell
+// form, which asks for what a price needs. Details come from the brand.
+import Base from "../layouts/Base.astro";
+import { brand } from "../brands/index.ts";
+import { readMessageForm, saveMessage, DIAL_CODES, TOPICS, type Message, type MessageErrors } from "../lib/leads.ts";
+
+let values: Partial<Message> = { topic: "Buying a car", dial: "+44" };
+let errors: MessageErrors = {};
+let failed = false;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  if (String(form.get("website") ?? "")) return Astro.redirect("/contact?sent=1#message", 303);
+  const read = readMessageForm(form);
+  values = read.data;
+  errors = read.errors;
+  if (!Object.keys(errors).length) {
+    try {
+      await saveMessage(read.data);
+      return Astro.redirect("/contact?sent=1#message", 303);
+    } catch {
+      failed = true;
+    }
+  }
+  Astro.response.status = 400;
+}
+const sent = Astro.url.searchParams.get("sent") === "1";
+const c = brand.contact;
+const sales = c.phones[0];
+const err = (k: keyof Message) => errors[k];
+---
+
+<Base title="Contact us" description={`How to reach ${brand.name}: phone, WhatsApp, email and the message form.`}>
+  <main class="wrap page">
+    <div class="intro">
+      <h1>Contact us</h1>
+      {brand.copy.contactIntro && <p>{brand.copy.contactIntro}</p>}
+    </div>
+
+    <div class="ways">
+      {sales && (
+        <a class="way" href={`tel:${sales.tel}`}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
+          <strong>Call</strong><span>{sales.display}</span>
+        </a>
+      )}
+      {c.whatsapp && (
+        <a class="way" href={`https://wa.me/${c.whatsapp}`}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z" /></svg>
+          <strong>WhatsApp</strong><span>Message us</span>
+        </a>
+      )}
+      <a class="way" href={`mailto:${c.email}`}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></svg>
+        <strong>Email</strong><span>{c.email}</span>
+      </a>
+    </div>
+
+    <div class="two">
+      <section id="message" class="box" aria-labelledby="msg-h">
+        {sent ? (
+          <div role="status">
+            <h2 id="msg-h">Thank you</h2>
+            <p class="m0">Your message has been sent.</p>
+          </div>
+        ) : (
+          <form method="post" action="/contact#message" novalidate>
+            <h2 id="msg-h">Send a message</h2>
+            {failed && <p class="err" role="alert">Sorry, that didn't send. Please try again, or call us.</p>}
+            <fieldset>
+              <legend class="lbl">What's it about?</legend>
+              <div class="pills">
+                {TOPICS.map((t) => (
+                  <label class="pill"><input type="radio" name="topic" value={t} checked={values.topic === t} /><span>{t}</span></label>
+                ))}
+              </div>
+            </fieldset>
+            {brand.features.sellForm && (
+              <p class="selling">
+                Selling? The quickest way to a price is the <a href="/sell-your-car">sell your car form</a>: it asks for the
+                details we need, and you can add photos.
+              </p>
+            )}
+            <div class="pair">
+              <div>
+                <label class="lbl" for="m-name">Name</label>
+                <input id="m-name" name="name" autocomplete="name" value={values.name} aria-invalid={err("name") ? "true" : undefined} aria-describedby={err("name") ? "m-name-err" : undefined} />
+                {err("name") && <p class="err" id="m-name-err">{err("name")}</p>}
+              </div>
+              <div>
+                <label class="lbl" for="m-email">Email</label>
+                <input id="m-email" name="email" type="email" autocomplete="email" value={values.email} aria-invalid={err("email") ? "true" : undefined} aria-describedby={err("email") ? "m-email-err" : undefined} />
+                {err("email") && <p class="err" id="m-email-err">{err("email")}</p>}
+              </div>
+            </div>
+            <div>
+              <label class="lbl" for="m-phone">Phone <span class="opt">(optional)</span></label>
+              <div class="tel">
+                <select name="dial" class="dial" aria-label="Country code">
+                  {DIAL_CODES.map(([code]) => <option value={code} selected={values.dial === code}>{code}</option>)}
+                </select>
+                <input id="m-phone" name="phone" type="tel" autocomplete="tel-national" value={values.phone} aria-invalid={err("phone") ? "true" : undefined} aria-describedby={err("phone") ? "m-phone-err" : undefined} />
+              </div>
+              {err("phone") && <p class="err" id="m-phone-err">{err("phone")}</p>}
+            </div>
+            <div>
+              <label class="lbl" for="m-msg">Message</label>
+              <textarea id="m-msg" name="message" rows="5" aria-invalid={err("message") ? "true" : undefined} aria-describedby={err("message") ? "m-msg-err" : undefined}>{values.message}</textarea>
+              {err("message") && <p class="err" id="m-msg-err">{err("message")}</p>}
+            </div>
+            <div class="hp" aria-hidden="true">
+              <label for="m-website">Leave this empty</label>
+              <input id="m-website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <button class="send" type="submit">Send message</button>
+            <p class="small">We use your details only to reply. <a href="/privacy">Privacy</a></p>
+          </form>
+        )}
+      </section>
+
+      <section class="box" aria-labelledby="visit-h">
+        <h2 id="visit-h">Visit us</h2>
+        <p class="m0 addr">{c.address}</p>
+        {c.viewings && <p class="m0">{c.viewings}</p>}
+        <p class="m0"><strong>Opening hours:</strong> {c.hours}</p>
+      </section>
+    </div>
+  </main>
+</Base>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+    padding-top: 44px;
+  }
+  .intro {
+    max-width: 720px;
+  }
+  h1 {
+    font: 700 clamp(42px, 6vw, 60px)/1.02 var(--font-display);
+    margin: 0;
+  }
+  .intro p {
+    margin: 12px 0 0;
+    font-size: 19px;
+  }
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .way {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 22px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    color: var(--color-fg);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .way:hover {
+    border-color: var(--color-fg);
+  }
+  .way svg {
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .way strong {
+    font: 700 24px/1.1 var(--font-display);
+  }
+  .two {
+    display: grid;
+    gap: 24px 40px;
+    align-items: start;
+  }
+  @media (min-width: 960px) {
+    .two {
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    }
+  }
+  .box {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    scroll-margin-top: 16px;
+  }
+  @media (max-width: 639px) {
+    .box {
+      padding: 22px 18px;
+    }
+  }
+  h2 {
+    font: 700 32px/1.1 var(--font-display);
+    margin: 0;
+  }
+  .m0 {
+    margin: 0;
+  }
+  .addr {
+    font-size: 17px;
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .lbl {
+    display: block;
+    margin: 0 0 6px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .opt {
+    font-weight: 400;
+    color: var(--color-muted);
+  }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill input {
+    position: absolute;
+    opacity: 0;
+  }
+  .pill span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--color-muted);
+    background: var(--color-surface);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .pill input:checked + span {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .pill input:focus-visible + span {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  /* Shown once "Selling my car" is picked (always, without :has support). */
+  .selling {
+    margin: 0;
+    padding: 14px 16px;
+    background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  }
+  form:has(input[name="topic"]:not([value="Selling my car"]):checked) .selling {
+    display: none;
+  }
+  .pair {
+    display: grid;
+    gap: 16px;
+  }
+  @media (min-width: 560px) {
+    .pair {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  input:not([type="radio"]),
+  textarea,
+  .dial {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 50px;
+    padding: 0 14px;
+    border: 1px solid var(--color-muted);
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font: 400 16px/1.4 var(--font-body);
+  }
+  textarea {
+    padding: 12px 14px;
+    resize: vertical;
+  }
+  input:focus,
+  textarea:focus,
+  .dial:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  [aria-invalid="true"] {
+    border-color: #b42318 !important;
+  }
+  .err {
+    margin: 6px 0 0;
+    color: #b42318;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .tel {
+    display: flex;
+  }
+  .dial {
+    flex: 0 0 76px;
+    width: 76px;
+    padding: 0 20px 0 12px;
+    border-right: 0;
+    background: var(--color-bg)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235d6470'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z'/%3E%3C/svg%3E")
+      no-repeat right 4px center / 16px;
+    appearance: none;
+    font-weight: 600;
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .send {
+    min-height: 54px;
+    border: 0;
+    background: var(--color-fg);
+    color: var(--color-surface);
+    font: 700 16px/1 var(--font-body);
+    cursor: pointer;
+  }
+  .small {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+</style>

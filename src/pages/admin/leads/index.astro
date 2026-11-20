@@ -18,8 +18,13 @@ if (Astro.request.method === "POST") {
   if (ok) return Astro.redirect(`/admin/leads?kind=${kind}&id=${idParam}&saved=1`, 303);
 }
 
-const [sell, enquiries] = await Promise.all([listLeads("sell"), listLeads("enquiries")]);
-const leads = kind === "sell" ? sell : enquiries;
+const [sell, enquiries, messages] = await Promise.all([listLeads("sell"), listLeads("enquiries"), listLeads("messages")]);
+const leads = { sell, enquiries, messages }[kind];
+const KIND_NAME: Record<LeadKind, [string, string]> = {
+  sell: ["Sell request", "sell requests"],
+  enquiries: ["Enquiry", "enquiries"],
+  messages: ["Message", "messages"],
+};
 const open = idParam ? await getLead(kind, idParam) : null;
 const saved = Astro.url.searchParams.get("saved") === "1";
 const fresh = (l: typeof sell) => l.filter((x) => x.admin.stage === "New").length;
@@ -30,6 +35,7 @@ const when = (iso: string) =>
 const title = (l: { kind: LeadKind; request: Record<string, unknown> }) => {
   const r = l.request;
   if (l.kind === "enquiries") return s((r.car as { name?: string } | undefined)?.name) || "Enquiry";
+  if (l.kind === "messages") return s(r.topic) || "Message";
   return [r.year, r.make, r.model].map(s).filter(Boolean).join(" ") || "Sell request";
 };
 
@@ -49,7 +55,7 @@ const facts: [string, string][] = open
         ["Email", email],
       ]
     : [
-        ["Car", title(open)],
+        [open.kind === "messages" ? "About" : "Car", title(open)],
         ["Name", s(r.name)],
         ["Phone", phone || "Not given"],
         ["Email", email],
@@ -66,6 +72,7 @@ const viewable = (f: string) => /\.(jpg|png|webp|avif)$/.test(f);
     <nav class="tabs" aria-label="Lead type">
       <a href="/admin/leads?kind=sell" aria-current={kind === "sell" ? "page" : undefined}>Sell requests{fresh(sell) > 0 && ` (${fresh(sell)} new)`}</a>
       <a href="/admin/leads?kind=enquiries" aria-current={kind === "enquiries" ? "page" : undefined}>Enquiries{fresh(enquiries) > 0 && ` (${fresh(enquiries)} new)`}</a>
+      <a href="/admin/leads?kind=messages" aria-current={kind === "messages" ? "page" : undefined}>Messages{fresh(messages) > 0 && ` (${fresh(messages)} new)`}</a>
     </nav>
 
     <div class="split">
@@ -85,10 +92,10 @@ const viewable = (f: string) => /\.(jpg|png|webp|avif)$/.test(f);
 
       {open ? (
         <section class="admin-box detail" aria-labelledby="lead-h">
-          <a class="back" href={`/admin/leads?kind=${kind}`}>All {kind === "sell" ? "sell requests" : "enquiries"}</a>
+          <a class="back" href={`/admin/leads?kind=${kind}`}>All {KIND_NAME[kind][1]}</a>
           <div class="d-head">
             <div>
-              <div class="k">{kind === "sell" ? "Sell request" : "Enquiry"} · {when(open.receivedAt)}</div>
+              <div class="k">{KIND_NAME[kind][0]} ·{when(open.receivedAt)}</div>
               <h2 id="lead-h">{title(open)}</h2>
             </div>
             <div class="acts">

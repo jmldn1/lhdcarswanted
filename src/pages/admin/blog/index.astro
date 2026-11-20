@@ -1,0 +1,128 @@
+---
+// Admin: the blog's posts, drafts included, newest first.
+import Admin from "../../../layouts/Admin.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { adminPosts, postDate } from "../../../lib/blog.ts";
+import { pick } from "../../../lib/photos.ts";
+
+const ready = hasDb();
+const posts = ready ? await adminPosts() : [];
+const deleted = Astro.url.searchParams.get("deleted") === "1";
+---
+
+<Admin title="Blog" active="blog">
+  <div class="page">
+    <div class="head">
+      <h1 class="admin-h1">Blog</h1>
+      {ready && (
+        <a class="a-btn pri" href="/admin/blog/new">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Write a post
+        </a>
+      )}
+    </div>
+    {!ready && <p class="a-note">The database isn't set up yet: add <code>MONGODB_URI</code> to <code>.env</code>, then restart the site.</p>}
+    {deleted && <p class="a-note" role="status">The post was deleted.</p>}
+
+    {ready && (posts.length ? (
+      <ul class="list">
+        {posts.map((p) => (
+          <li>
+            <a class="row" href={`/admin/blog/${p.id}`}>
+              {p.cover ? <img src={pick(p.cover.avif, 300).url} alt="" width="120" height="68" loading="lazy" /> : <span class="nophoto">No photo</span>}
+              <span class="name">
+                <strong>{p.title || "Untitled"}</strong>
+                <span class="muted">{[p.category, postDate(p.date)].filter(Boolean).join(" · ")}</span>
+              </span>
+              <span><span class={`a-chip ${p.status === "published" ? "available" : "draft"}`}>{p.status === "published" ? "Published" : "Draft"}</span></span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="empty">No posts yet. Write the first one.</p>
+    ))}
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    max-width: 1000px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .list li + li {
+    border-top: 1px solid var(--color-line);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+  .row:hover {
+    background: var(--color-bg);
+  }
+  .row img,
+  .nophoto {
+    width: 120px;
+    height: 68px;
+    object-fit: cover;
+    background: var(--color-line);
+  }
+  .nophoto {
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+  .name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .name strong {
+    overflow-wrap: anywhere;
+  }
+  .muted {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .empty {
+    margin: 0;
+    padding: 28px;
+    text-align: center;
+    color: var(--color-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  @media (max-width: 639px) {
+    .row {
+      grid-template-columns: 96px minmax(0, 1fr);
+    }
+    .row img,
+    .nophoto {
+      width: 96px;
+      height: 54px;
+      grid-row: span 2;
+    }
+  }
+</style>

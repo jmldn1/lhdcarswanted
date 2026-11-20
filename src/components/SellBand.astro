@@ -1,0 +1,79 @@
+---
+// The dark "Got a car to sell?" band at the foot of the blog, a post and
+// About (the homepage has its own, with a photo). Words from the brand.
+import { brand } from "../brands/index.ts";
+
+interface Props {
+  /** A second button, e.g. Contact us. */
+  second?: { href: string; label: string };
+}
+const sell = brand.features.sellForm ? brand.copy.sell : undefined;
+const second =
+  Astro.props.second ?? (brand.features.carsWanted ? { href: "/cars-wanted", label: "See the cars we want" } : undefined);
+---
+
+{sell && (
+  <section class="band">
+    <div class="wrap in">
+      <div>
+        <h2>{sell.bandHeading ?? "Got a car to sell?"}</h2>
+        {sell.bandText && <p>{sell.bandText}</p>}
+      </div>
+      <div class="btns">
+        <a class="btn light" href="/sell-your-car">Get my free valuation</a>
+        {second && <a class="btn ghost" href={second.href}>{second.label}</a>}
+      </div>
+    </div>
+  </section>
+)}
+
+<style>
+  .band {
+    background: var(--color-band);
+    color: var(--color-band-fg);
+  }
+  .in {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px 32px;
+    padding-block: 44px;
+  }
+  h2 {
+    font: 700 clamp(28px, 3.4vw, 36px)/1.1 var(--font-display);
+    margin: 0;
+    max-width: 640px;
+  }
+  p {
+    margin: 8px 0 0;
+    max-width: 640px;
+    color: var(--color-band-muted);
+    font-size: 17px;
+  }
+  .btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .btn {
+    min-height: 50px;
+    font-weight: 700;
+    border-width: 1.5px;
+  }
+  .light {
+    background: var(--color-band-fg);
+    border-color: var(--color-band-fg);
+    color: var(--color-band);
+  }
+  .ghost {
+    border-color: color-mix(in srgb, var(--color-band-fg) 70%, transparent);
+    color: var(--color-band-fg);
+  }
+  @media (max-width: 639px) {
+    .btns,
+    .btn {
+      width: 100%;
+    }
+  }
+</style>

@@ -8,14 +8,14 @@ import { listLeads } from "../lib/leads.ts";
 
 interface Props {
   title: string;
-  active?: "cars" | "leads";
+  active?: "cars" | "blog" | "leads";
 }
 const { title, active } = Astro.props;
 
 const fontModules = import.meta.glob<{ preload: string[] }>("../brands/fonts/*.ts", { eager: true });
 const preloadFonts = fontModules[`../brands/fonts/${brand.id}.ts`]?.preload ?? [];
 
-const newLeads = (await Promise.all([listLeads("sell"), listLeads("enquiries")]))
+const newLeads = (await Promise.all([listLeads("sell"), listLeads("enquiries"), listLeads("messages")]))
   .flat()
   .filter((l) => l.admin.stage === "New").length;
 ---
@@ -41,6 +41,12 @@ const newLeads = (await Promise.all([listLeads("sell"), listLeads("enquiries")])
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 17h14M6 17l1.5-6h9L18 17M8 11l1-3h6l1 3" /><circle cx="8" cy="17" r="1.5" /><circle cx="16" cy="17" r="1.5" /></svg>
           <span>Cars</span>
         </a>
+        {brand.features.blog && (
+          <a class="item" href="/admin/blog" aria-current={active === "blog" ? "page" : undefined}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" /></svg>
+            <span>Blog</span>
+          </a>
+        )}
         <a class="item" href="/admin/leads" aria-current={active === "leads" ? "page" : undefined}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></svg>
           <span>Leads</span>

@@ -1,0 +1,128 @@
+---
+// Admin: edit a post. Delete needs a tick to confirm and removes its photos.
+import Admin from "../../../layouts/Admin.astro";
+import PostForm from "../../../components/admin/PostForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { adminPost, adminPosts, savePost, deletePost, categories, type Post } from "../../../lib/blog.ts";
+import { readPostForm, type PostErrors } from "../../../lib/post-form.ts";
+import { applyCover, deletePostFiles } from "../../../lib/post-cover.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/blog", 303);
+const found = await adminPost(Astro.params.id ?? "");
+if (!found) return new Response("No such post", { status: 404 });
+let post: Post = found;
+let errors: PostErrors = {};
+let deleteError = "";
+
+if (Astro.request.method === "POST") {
+  if (Number(Astro.request.headers.get("content-length") ?? 0) > 40 * 1024 * 1024) {
+    errors = { cover: "That photo is too big (30 MB at most)." };
+  } else {
+    const form = await Astro.request.formData();
+    if (form.get("intent") === "delete") {
+      if (form.get("confirm") === "on") {
+        await deletePost(post.id);
+        await deletePostFiles(post.id);
+        return Astro.redirect("/admin/blog?deleted=1", 303);
+      }
+      deleteError = "Tick the box to confirm.";
+    } else {
+      const read = readPostForm(form, post);
+      errors = read.errors;
+      if (!Object.keys(errors).length) {
+        const withCover = await applyCover(form, read.post);
+        if (withCover.error) errors.cover = withCover.error;
+        else {
+          await savePost(withCover.post);
+          return Astro.redirect(`/admin/blog/${post.id}?saved=1`, 303);
+        }
+      }
+      post = read.post;
+    }
+  }
+  Astro.response.status = 400;
+}
+const saved = Astro.url.searchParams.get("saved") === "1";
+const cats = categories(await adminPosts()).map((c) => c.name);
+---
+
+<Admin title={post.title || "Post"} active="blog">
+  <div class="page">
+    <div class="head">
+      <div>
+        <a class="up" href="/admin/blog">Blog</a>
+        <h1 class="admin-h1">{post.title || "Untitled"}</h1>
+      </div>
+      {found.status === "published" && <a class="a-btn" href={`/blog/${post.slug}`} target="_blank" rel="noopener">View on the site</a>}
+    </div>
+    {saved && <p class="a-note" role="status">Saved.</p>}
+
+    <PostForm post={post} errors={errors} categories={cats} mode="edit" />
+
+    <details class="danger" open={Boolean(deleteError)}>
+      <summary>Delete this post</summary>
+      <form method="post">
+        <input type="hidden" name="intent" value="delete" />
+        <p>This removes the post from the site, with its photo. It can't be undone.</p>
+        <label class="check"><input type="checkbox" name="confirm" /> Yes, delete this post</label>
+        {deleteError && <p class="a-err" role="alert">{deleteError}</p>}
+        <button class="a-btn del" type="submit">Delete the post</button>
+      </form>
+    </details>
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .danger summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #b42318;
+    padding: 8px 0;
+  }
+  .danger form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 18px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .danger p {
+    margin: 0;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .del {
+    border-color: #b42318;
+    background: #b42318;
+    color: #fff;
+  }
+</style>
