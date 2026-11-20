@@ -81,3 +81,11 @@
     color: var(--color-accent-ink);
   }
 }
+
+/* lightGallery's thumbnails (src/scripts/lightbox.ts): the photo showing in
+   the brand accent. Unlayered and one class more than its own rule, which
+   loads after this. */
+.lg-outer .lg-thumb .lg-thumb-item.active,
+.lg-outer .lg-thumb .lg-thumb-item:hover {
+  border-color: var(--color-accent);
+}

@@ -11,7 +11,7 @@ import CarPhoto from "../../components/CarPhoto.astro";
 import CarCard from "../../components/CarCard.astro";
 import { brand } from "../../brands/index.ts";
 import { getCar, listCars, specsLine, priceLabel, makeSlug, nice } from "../../lib/cars.ts";
-import { srcset, pick } from "../../lib/photos.ts";
+import { lightboxJson } from "../../lib/lightbox.ts";
 
 const car = await getCar(Astro.params.slug ?? "");
 if (!car) return new Response(null, { status: 404 });
@@ -34,20 +34,7 @@ const first = car.photos[0];
 const ratio = first ? `${first.width} / ${first.height}` : "3 / 2";
 const sales = brand.contact.phones[0];
 
-// The full-screen gallery's photos: AVIF with the JPG as fallback, and a small
-// AVIF for its thumbnails. Text in subHtml is HTML there, so it is escaped.
-const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const name = `${car.make} ${car.model}`;
-const lightbox = car.photos.map((p, i) => ({
-  src: p.jpg[p.jpg.length - 1].url,
-  srcset: srcset(p.jpg),
-  sizes: "100vw",
-  sources: [{ type: "image/avif", srcset: srcset(p.avif), sizes: "100vw" }],
-  thumb: pick(p.avif, 200).url,
-  alt: `${name}, photo ${i + 1} of ${car.photos.length}`,
-  subHtml: `<p>${esc(name)}</p>`,
-}));
-const lightboxJson = JSON.stringify(lightbox).replace(/</g, "\\u003c");
 const enquire = `mailto:${brand.contact.email}?subject=${encodeURIComponent(`${name} (${Astro.url.pathname})`)}`;
 const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComponent(`${name}: ${Astro.url.href}`)}`;
 ---
@@ -103,7 +90,7 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
             ))}
           </div>
         )}
-        <script type="application/json" id="lightbox-photos" set:html={lightboxJson} />
+        <script type="application/json" id="lightbox-photos" set:html={lightboxJson(car)} />
       </section>
 
       <aside class="card" aria-label="Price and details">
@@ -187,10 +174,7 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
 </Base>
 
 <script>
-  import "lightgallery/css/lightgallery.css";
-  import "lightgallery/css/lg-zoom.css";
-  import "lightgallery/css/lg-thumbnail.css";
-  import "lightgallery/css/lg-fullscreen.css";
+  import { openLightbox } from "../../scripts/lightbox.ts";
 
   // Arrows, counter and thumbnails for the native strip (swipe and scroll need no script).
   const strip = document.querySelector<HTMLElement>(".strip");
@@ -232,47 +216,9 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
     );
     strip.querySelectorAll(".slide").forEach((s) => io.observe(s));
 
-    // Full screen: lightGallery's script loads on the first open. Settings as
-    // on v1: a fade between photos, zoom, a fullscreen button, swipe down to
-    // close on phones, and smaller thumbnails there (with a button to hide
-    // them) so the photo gets the screen. Closing leaves the page on the
-    // photo last seen.
-    let gallery: { openGallery: (i: number) => void; index: number } | undefined;
-    const open = async (i: number) => {
-      if (!gallery) {
-        const [{ default: lightGallery }, { default: lgZoom }, { default: lgThumbnail }, { default: lgFullscreen }] =
-          await Promise.all([
-            import("lightgallery"),
-            import("lightgallery/plugins/zoom"),
-            import("lightgallery/plugins/thumbnail"),
-            import("lightgallery/plugins/fullscreen"),
-          ]);
-        const items = JSON.parse(document.getElementById("lightbox-photos")?.textContent ?? "[]");
-        const host = document.createElement("div");
-        document.body.append(host);
-        const phone = matchMedia("(max-width: 639px)").matches;
-        const lg = lightGallery(host, {
-          dynamic: true,
-          dynamicEl: items,
-          plugins: [lgZoom, lgThumbnail, lgFullscreen],
-          download: false,
-          mode: "lg-fade",
-          speed: 450,
-          swipeToClose: true,
-          allowMediaOverlap: phone,
-          toggleThumb: phone,
-          thumbWidth: phone ? 64 : 100,
-          thumbHeight: phone ? "48px" : "64px",
-          thumbMargin: 6,
-          mobileSettings: { controls: false, showCloseIcon: true, download: false },
-        });
-        host.addEventListener("lgBeforeClose", () => {
-          strip.scrollTo({ left: lg.index * strip.clientWidth, behavior: "instant" });
-        });
-        gallery = lg;
-      }
-      gallery.openGallery(i);
-    };
+    // Full screen; closing leaves the page on the photo last seen.
+    const open = (i: number) =>
+      openLightbox(i, (last) => strip.scrollTo({ left: last * strip.clientWidth, behavior: "instant" }));
     strip.querySelectorAll(".slide").forEach((s, i) => s.addEventListener("click", () => open(i)));
     document.querySelector(".view-all")?.addEventListener("click", () => open(current()));
   }
@@ -696,14 +642,5 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
       background: var(--color-surface);
       border-top: 1px solid var(--color-line);
     }
-  }
-</style>
-
-<style is:global>
-  /* lightGallery's thumbnails: the photo showing in the brand accent (one
-     class more than its own rule, which loads after this). */
-  .lg-outer .lg-thumb .lg-thumb-item.active,
-  .lg-outer .lg-thumb .lg-thumb-item:hover {
-    border-color: var(--color-accent);
   }
 </style>

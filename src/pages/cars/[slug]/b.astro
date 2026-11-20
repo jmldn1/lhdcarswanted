@@ -1,0 +1,709 @@
+---
+// A car's page, layout B ("Gallery first", from the car page mockups),
+// built beside layout A (../[slug].astro) to compare; kept out of search
+// engines. A wide mosaic of the first five photos (one photo on phones),
+// the title and price, a strip of key facts, the description beside an
+// enquiry form, the sell band and more cars.
+//
+// The enquiry form works without JavaScript: it posts to this page, which
+// saves it (LEADS_DIR/enquiries) and redirects to a thank-you (so a refresh
+// can't send it twice). Emailing it to the dealer comes with the email sender.
+import Base from "../../../layouts/Base.astro";
+import CarPhoto from "../../../components/CarPhoto.astro";
+import CarCard from "../../../components/CarCard.astro";
+import { brand } from "../../../brands/index.ts";
+import { getCar, listCars, specsLine, priceLabel, makeSlug, nice } from "../../../lib/cars.ts";
+import { lightboxJson } from "../../../lib/lightbox.ts";
+import { readEnquiryForm, saveEnquiry, DIAL_CODES, type Enquiry, type EnquiryErrors } from "../../../lib/leads.ts";
+
+const car = await getCar(Astro.params.slug ?? "");
+if (!car) return new Response(null, { status: 404 });
+
+const name = `${car.make} ${car.model}`;
+const here = `/cars/${car.slug}/b`;
+
+let values: Partial<Enquiry> = { dial: "+44", message: `I'm interested in the ${name}.` };
+let errors: EnquiryErrors = {};
+let failed = false;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  // Left empty by people; filled by bots. Bots get the thank-you anyway.
+  if (String(form.get("website") ?? "")) return Astro.redirect(`${here}?sent=1#enquire`, 303);
+  const read = readEnquiryForm(form);
+  values = read.data;
+  errors = read.errors;
+  if (!Object.keys(errors).length) {
+    try {
+      await saveEnquiry(read.data, { id: car.id, name, url: `/cars/${car.slug}` });
+      return Astro.redirect(`${here}?sent=1#enquire`, 303);
+    } catch {
+      failed = true;
+    }
+  }
+  Astro.response.status = 400;
+}
+const sent = Astro.url.searchParams.get("sent") === "1";
+
+const facts = [
+  ["Year", car.year],
+  ["Mileage", car.mileage],
+  ["Colour", car.colour && nice(car.colour)],
+  ["Registered", car.registered && nice(car.registered)],
+].filter((f): f is [string, string] => Boolean(f[1]));
+const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== "sold").slice(0, 2);
+const sales = brand.contact.phones[0];
+const whatsapp = brand.contact.whatsapp
+  ? `https://wa.me/${brand.contact.whatsapp}?text=${encodeURIComponent(`${name}: ${Astro.url.origin}/cars/${car.slug}`)}`
+  : "";
+const sell = brand.features.sellForm ? brand.copy.sell : undefined;
+
+// The mosaic: the first photo large and the next four beside it, the last
+// of those saying how many there are. Fewer than five photos: just the first.
+const n = car.photos.length;
+const mosaic = n >= 5;
+const shown = car.photos.slice(0, mosaic ? 5 : 1);
+
+const err = (k: keyof Enquiry) => errors[k];
+---
+
+<Base title={name} description={specsLine(car)} noindex>
+ <div class="car-page">
+  <p class="wrap compare">Layout B, for comparison · <a href={`/cars/${car.slug}`}>See layout A</a></p>
+
+  <div class="wrap gallery-wrap">
+    {n > 0 && (
+      <section class:list={["mosaic", { single: !mosaic }]} aria-label="Photos">
+        {shown.map((p, i) => (
+          <button
+            type="button"
+            class:list={["tile", { lead: i === 0 }]}
+            data-i={i}
+            aria-label={mosaic && i === shown.length - 1 ? `View all ${n} photos` : `Open photo ${i + 1} of ${n} full screen`}
+          >
+            <CarPhoto
+              photo={p}
+              fit="cover"
+              priority={i === 0}
+              alt={i === 0 ? `${name}, photo 1 of ${n}` : ""}
+              sizes={i === 0 ? "(min-width: 1240px) 600px, (min-width: 640px) 50vw, 100vw" : "(min-width: 1240px) 300px, 25vw"}
+              style={i === 0 ? `view-transition-name: car-${car.id}` : undefined}
+            />
+            {mosaic && i === shown.length - 1 && (
+              <span class="all" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+                View all {n} photos
+              </span>
+            )}
+            {i === 0 && n > 1 && (
+              <span class:list={["count", { always: !mosaic }]} aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg>
+                {n} photos
+              </span>
+            )}
+          </button>
+        ))}
+      </section>
+    )}
+    <script type="application/json" id="lightbox-photos" set:html={lightboxJson(car)} />
+  </div>
+
+  <main class="wrap page">
+    <div class="head">
+      <div>
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <a href="/cars">All cars</a><span aria-hidden="true">/</span><a href={`/cars?make=${makeSlug(car.make)}`}>{car.make}</a>
+        </nav>
+        {car.status !== "available" && <span class="status">{car.status === "sold" ? "Sold" : "Reserved"}</span>}
+        <h1>{name}</h1>
+        <p class="specs">{specsLine(car)}</p>
+      </div>
+      <div class="buy">
+        <p class="price">
+          <span class="amount">{priceLabel(car)}</span>
+          {!car.price && <span class="poa">Price on application</span>}
+        </p>
+        <div class="buy-btns">
+          {sales && (
+            <a class="btn btn-primary big" href={`tel:${sales.tel}`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
+              Call {sales.display}
+            </a>
+          )}
+          {whatsapp && (
+            <a class="btn big" href={whatsapp}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z" /></svg>
+              WhatsApp
+            </a>
+          )}
+          <a class="btn btn-dark big" href="#enquire">Enquire</a>
+        </div>
+      </div>
+    </div>
+
+    {facts.length > 0 && (
+      <dl class="strip">
+        {facts.map(([k, v]) => (
+          <div><dt>{k}</dt><dd>{v}</dd></div>
+        ))}
+      </dl>
+    )}
+
+    <div class="two">
+      <section class="about" aria-labelledby="about-h">
+        <h2 id="about-h">About this car</h2>
+        {car.description && <p>{car.description}</p>}
+      </section>
+
+      <section id="enquire" class="enquire" aria-labelledby="enq-h">
+        {sent ? (
+          <div class="thanks" role="status">
+            <h2 id="enq-h">Thank you</h2>
+            <p>Your enquiry about the {name} has been sent.</p>
+          </div>
+        ) : (
+          <form method="post" action={`${here}#enquire`} novalidate>
+            <h2 id="enq-h">Ask about this car</h2>
+            {failed && <p class="fail" role="alert">Sorry, that didn't send. Please try again, or call us.</p>}
+            <div class="field">
+              <label for="e-name">Name</label>
+              <input id="e-name" name="name" autocomplete="name" value={values.name} aria-invalid={err("name") ? "true" : undefined} aria-describedby={err("name") ? "e-name-err" : undefined} />
+              {err("name") && <p class="err" id="e-name-err">{err("name")}</p>}
+            </div>
+            <div class="field">
+              <label for="e-email">Email</label>
+              <input id="e-email" name="email" type="email" autocomplete="email" value={values.email} aria-invalid={err("email") ? "true" : undefined} aria-describedby={err("email") ? "e-email-err" : undefined} />
+              {err("email") && <p class="err" id="e-email-err">{err("email")}</p>}
+            </div>
+            <div class="field">
+              <label for="e-phone">Phone <span class="opt">(optional)</span></label>
+              <div class="tel">
+                <select name="dial" class="dial" aria-label="Country code">
+                  {DIAL_CODES.map(([code]) => <option value={code} selected={values.dial === code}>{code}</option>)}
+                </select>
+                <input id="e-phone" name="phone" type="tel" autocomplete="tel-national" value={values.phone} aria-invalid={err("phone") ? "true" : undefined} aria-describedby={err("phone") ? "e-phone-err" : undefined} />
+              </div>
+              {err("phone") && <p class="err" id="e-phone-err">{err("phone")}</p>}
+            </div>
+            <div class="field">
+              <label for="e-msg">Message</label>
+              <textarea id="e-msg" name="message" rows="4" aria-invalid={err("message") ? "true" : undefined} aria-describedby={err("message") ? "e-msg-err" : undefined}>{values.message}</textarea>
+              {err("message") && <p class="err" id="e-msg-err">{err("message")}</p>}
+            </div>
+            <div class="hp" aria-hidden="true">
+              <label for="e-website">Leave this empty</label>
+              <input id="e-website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <button class="btn btn-dark big send" type="submit">Send enquiry</button>
+            {sales && <p class="or">Or call us on <a href={`tel:${sales.tel}`}>{sales.display}</a>.</p>}
+          </form>
+        )}
+      </section>
+    </div>
+  </main>
+
+  {sell && (
+    <section class="sell">
+      <div class="wrap sell-in">
+        <div>
+          <h2>{sell.bandHeading ?? "Got a car to sell?"}</h2>
+          {sell.bandText && <p>{sell.bandText}</p>}
+        </div>
+        <div class="sell-btns">
+          <a class="btn btn-light big" href="/sell-your-car">Get my free valuation</a>
+          {brand.features.carsWanted && <a class="btn btn-ghost big" href="/cars-wanted">See the cars we want</a>}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {others.length > 0 && (
+    <section class="wrap more" aria-labelledby="more-h">
+      <h2 id="more-h">More cars in stock</h2>
+      <div class="more-grid">
+        {others.map((c) => <CarCard car={c} fit={brand.cardPhoto.fit} />)}
+        <a class="all-cars" href="/cars">
+          <strong>See all our cars</strong>
+          <span>Every car we have in stock</span>
+          <span class="go">Browse cars</span>
+        </a>
+      </div>
+    </section>
+  )}
+
+  <div class="call-bar">
+    {sales && <a class="btn big" href={`tel:${sales.tel}`}>Call</a>}
+    <a class="btn btn-dark big" href="#enquire">Enquire</a>
+  </div>
+ </div>
+</Base>
+
+<script>
+  import { openLightbox } from "../../../scripts/lightbox.ts";
+
+  // Each mosaic photo opens full screen at that photo; the last one ("View
+  // all") and, on phones, the single photo open at the start.
+  document.querySelectorAll<HTMLButtonElement>(".mosaic .tile").forEach((t) => {
+    t.addEventListener("click", () => openLightbox(Number(t.dataset.i ?? 0)));
+  });
+</script>
+
+<style>
+  .compare {
+    margin: 12px auto 0;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .gallery-wrap {
+    margin-top: 12px;
+  }
+  /* Desktop: one large photo and four small; phones: the large one only. */
+  .mosaic {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    aspect-ratio: 32 / 11;
+  }
+  .mosaic.single {
+    display: block;
+    aspect-ratio: 16 / 9;
+    max-height: 640px;
+  }
+  .tile {
+    position: relative;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: var(--color-line);
+    cursor: zoom-in;
+  }
+  .single .tile {
+    width: 100%;
+    height: 100%;
+  }
+  .tile :global(img) {
+    transition: transform 0.3s ease;
+  }
+  .tile:hover :global(img) {
+    transform: scale(1.03);
+  }
+  .lead {
+    grid-row: span 2;
+  }
+  .all,
+  .count {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 700 15px/1 var(--font-body);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--color-fg) 30%, transparent);
+  }
+  .all {
+    right: 14px;
+    bottom: 14px;
+    height: 40px;
+    padding: 0 16px;
+    background: var(--color-surface);
+    color: var(--color-fg);
+  }
+  .count {
+    display: none;
+    right: 12px;
+    bottom: 12px;
+    height: 34px;
+    padding: 0 12px;
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font-size: 14px;
+  }
+  .count.always {
+    display: inline-flex;
+  }
+  .all svg,
+  .count svg,
+  .big svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  @media (max-width: 639px) {
+    .gallery-wrap {
+      padding-inline: 0;
+    }
+    .mosaic {
+      display: block;
+      aspect-ratio: 4 / 3;
+    }
+    .mosaic .tile:not(.lead) {
+      display: none;
+    }
+    .mosaic .lead {
+      width: 100%;
+      height: 100%;
+    }
+    .count {
+      display: inline-flex;
+    }
+  }
+
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding-top: 28px;
+    padding-bottom: 64px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px 32px;
+  }
+  .crumbs {
+    display: flex;
+    gap: 8px;
+    font-size: 15px;
+    color: var(--color-muted);
+  }
+  .crumbs a {
+    color: var(--color-muted);
+  }
+  .status {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 10px;
+    background: var(--color-fg);
+    color: var(--color-surface);
+    font: 700 12px/1 var(--font-body);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  h1 {
+    font: 700 clamp(36px, 5vw, 56px)/1.02 var(--font-display);
+    margin: 8px 0 0;
+    overflow-wrap: anywhere;
+  }
+  .specs {
+    margin: 6px 0 0;
+    color: var(--color-muted);
+    font-size: 18px;
+  }
+  .buy {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 20px;
+  }
+  .price {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .amount {
+    font: 700 44px/1 var(--font-display);
+  }
+  .poa {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .buy-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .big {
+    min-height: 50px;
+    font-weight: 700;
+    border-width: 1.5px;
+  }
+  .btn-dark {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .btn-light {
+    background: var(--color-band-fg);
+    border-color: var(--color-band-fg);
+    color: var(--color-band);
+  }
+  .btn-ghost {
+    border-color: color-mix(in srgb, var(--color-band-fg) 70%, transparent);
+    color: var(--color-band-fg);
+  }
+  @media (max-width: 639px) {
+    .buy,
+    .buy-btns {
+      width: 100%;
+    }
+    .price {
+      align-items: flex-start;
+    }
+    .buy-btns {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+    }
+    .buy-btns .btn-dark {
+      display: none;
+    }
+  }
+
+  /* The key facts in large numbers. */
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .strip div {
+    padding: 16px 20px;
+    border-right: 1px solid var(--color-line);
+    margin-right: -1px;
+  }
+  .strip dt {
+    font: 700 12px/1.3 var(--font-body);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+  .strip dd {
+    margin: 4px 0 0;
+    font: 700 26px/1.1 var(--font-display);
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 639px) {
+    .strip {
+      grid-template-columns: 1fr 1fr;
+    }
+    .strip div {
+      margin-right: 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--color-line);
+    }
+    .strip div:nth-child(odd) {
+      border-right: 1px solid var(--color-line);
+    }
+  }
+
+  .two {
+    display: grid;
+    gap: 32px 48px;
+    align-items: start;
+  }
+  @media (min-width: 960px) {
+    .two {
+      grid-template-columns: minmax(0, 1fr) 420px;
+    }
+  }
+  .about h2,
+  .enquire h2,
+  .more h2 {
+    font: 700 30px/1.1 var(--font-display);
+    margin: 0 0 14px;
+  }
+  .about p {
+    margin: 0;
+    font-size: 18px;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  /* The enquiry form, in the sell page's plain style. */
+  .enquire {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    padding: 28px;
+    scroll-margin-top: 16px;
+  }
+  @media (max-width: 639px) {
+    .enquire {
+      padding: 22px 18px;
+    }
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  form h2 {
+    margin-bottom: 0 !important;
+  }
+  .field label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .opt {
+    font-weight: 400;
+    color: var(--color-muted);
+  }
+  .field input,
+  .field textarea,
+  .dial {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 50px;
+    padding: 0 14px;
+    border: 1px solid var(--color-muted);
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font: 400 16px/1.4 var(--font-body);
+  }
+  .field textarea {
+    padding: 12px 14px;
+    resize: vertical;
+  }
+  .field input:focus,
+  .field textarea:focus,
+  .dial:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+  [aria-invalid="true"] {
+    border-color: #b42318 !important;
+  }
+  .err,
+  .fail {
+    margin: 6px 0 0;
+    color: #b42318;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .tel {
+    display: flex;
+  }
+  .dial {
+    flex: 0 0 76px;
+    width: 76px;
+    padding: 0 20px 0 12px;
+    border-right: 0;
+    background: var(--color-bg)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235d6470'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z'/%3E%3C/svg%3E")
+      no-repeat right 4px center / 16px;
+    appearance: none;
+    font-weight: 600;
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .send {
+    width: 100%;
+    min-height: 54px;
+    font-size: 16px;
+  }
+  .or {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .thanks p {
+    margin: 0;
+  }
+
+  /* The sell band, as on the homepage. */
+  .sell {
+    background: var(--color-band);
+    color: var(--color-band-fg);
+  }
+  .sell-in {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px 32px;
+    padding-block: 44px;
+  }
+  .sell h2 {
+    font: 700 clamp(28px, 3.4vw, 36px)/1.1 var(--font-display);
+    margin: 0;
+    max-width: 640px;
+  }
+  .sell p {
+    margin: 8px 0 0;
+    max-width: 640px;
+    color: var(--color-band-muted);
+    font-size: 17px;
+  }
+  .sell-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  @media (max-width: 639px) {
+    .sell-btns,
+    .sell-btns .btn {
+      width: 100%;
+    }
+  }
+
+  .more {
+    padding-block: 56px 72px;
+  }
+  .more-grid {
+    display: grid;
+    gap: 24px;
+  }
+  @media (min-width: 600px) {
+    .more-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 900px) {
+    .more-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .all-cars {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    color: var(--color-muted);
+    text-decoration: none;
+  }
+  .all-cars strong {
+    font: 700 26px/1.1 var(--font-display);
+    color: var(--color-fg);
+  }
+  .all-cars .go {
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  .call-bar {
+    display: none;
+  }
+  @media (max-width: 639px) {
+    .call-bar {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      gap: 8px;
+      padding: 10px max(16px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-bottom, 0px));
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-line);
+    }
+  }
+</style>

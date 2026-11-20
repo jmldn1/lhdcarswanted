@@ -18,8 +18,10 @@ const icon =
 interface Props {
   title: string;
   description?: string;
+  /** Keep the page out of search engines (layouts being compared, etc.). */
+  noindex?: boolean;
 }
-const { title, description } = Astro.props;
+const { title, description, noindex = false } = Astro.props;
 const path = Astro.url.pathname;
 const sales = brand.contact.phones[0];
 ---
@@ -31,6 +33,7 @@ const sales = brand.contact.phones[0];
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title} | {brand.name}</title>
     {description && <meta name="description" content={description} />}
+    {noindex && <meta name="robots" content="noindex" />}
     <link rel="icon" href={icon} />
     {preloadFonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
     <style is:inline set:html={brandCss()}></style>

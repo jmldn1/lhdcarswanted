@@ -1,4 +1,4 @@
-// Sell your car requests. Customer data: each request is written to its own
+// Sell your car requests and enquiries about cars. Customer data: each is written to its own
 // folder under LEADS_DIR (default data/leads, git-ignored; outside the app in
 // production) and never logged. Emailing them to the dealer comes with this
 // site's own email sender.
@@ -79,20 +79,61 @@ const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/avif": "avif",
 };
 
+/** A new, empty folder for one request: LEADS_DIR/<kind>/<date>-<random>. */
+async function newLeadDir(kind: "sell" | "enquiries") {
+  const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomBytes(6).toString("hex")}`;
+  const dir = path.join(process.env.LEADS_DIR || path.resolve("data/leads"), kind, id);
+  await fs.mkdir(dir, { recursive: true });
+  return { id, dir };
+}
+
+/** The number as one would dial it: the code, then the number without its leading 0. */
+const fullPhone = (dial: string, phone: string) => (phone ? `${dial} ${phone.replace(/^0+/, "")}` : "");
+
 /** Writes one request (and its photos, as sent) to its own folder. Returns its id. */
 export async function saveSellRequest(data: SellRequest, photos: File[]): Promise<string> {
-  const id = `${new Date().toISOString().slice(0, 10)}-${crypto.randomBytes(6).toString("hex")}`;
-  const dir = path.join(process.env.LEADS_DIR || path.resolve("data/leads"), "sell", id);
-  await fs.mkdir(dir, { recursive: true });
+  const { id, dir } = await newLeadDir("sell");
   const files: string[] = [];
   for (const [i, f] of photos.entries()) {
     const name = `photo-${String(i + 1).padStart(2, "0")}.${EXT[f.type] ?? "img"}`;
     await fs.writeFile(path.join(dir, name), Buffer.from(await f.arrayBuffer()));
     files.push(name);
   }
-  // The number as one would dial it: the code, then the number without its leading 0.
-  const phone = data.phone ? `${data.dial} ${data.phone.replace(/^0+/, "")}` : "";
-  const record = { id, receivedAt: new Date().toISOString(), ...data, phone, photos: files };
+  const record = { id, receivedAt: new Date().toISOString(), ...data, phone: fullPhone(data.dial, data.phone), photos: files };
+  await fs.writeFile(path.join(dir, "request.json"), JSON.stringify(record, null, 2));
+  return id;
+}
+
+/** An enquiry about one car, from the car page's form. */
+export interface Enquiry {
+  name: string;
+  email: string;
+  dial: string;
+  phone: string;
+  message: string;
+}
+export type EnquiryErrors = Partial<Record<keyof Enquiry, string>>;
+
+export function readEnquiryForm(form: FormData): { data: Enquiry; errors: EnquiryErrors } {
+  const data: Enquiry = {
+    name: text(form, "name", 100),
+    email: text(form, "email", 200),
+    dial: oneOf(text(form, "dial"), DIALS, "+44"),
+    phone: text(form, "phone", 40),
+    message: text(form, "message", 4000),
+  };
+  const errors: EnquiryErrors = {};
+  if (!data.name) errors.name = "Enter your name";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.email = "Enter an email address like you@example.com";
+  if (data.phone && !/^[\d\s()+-]{6,}$/.test(data.phone)) errors.phone = "Enter a phone number, or leave it blank";
+  if (!data.message) errors.message = "Enter a message";
+  return { data, errors };
+}
+
+/** Writes one enquiry, with the car it's about, to its own folder. Returns its id. */
+export async function saveEnquiry(data: Enquiry, car: { id: string; name: string; url: string }): Promise<string> {
+  const { id, dir } = await newLeadDir("enquiries");
+  const record = { id, receivedAt: new Date().toISOString(), car, ...data, phone: fullPhone(data.dial, data.phone) };
   await fs.writeFile(path.join(dir, "request.json"), JSON.stringify(record, null, 2));
   return id;
 }
