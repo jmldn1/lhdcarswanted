@@ -11,6 +11,7 @@ import Base from "../layouts/Base.astro";
 import CarPhoto from "../components/CarPhoto.astro";
 import { brand } from "../brands/index.ts";
 import { listCars } from "../lib/cars.ts";
+import { getPagePhotos } from "../lib/page-photos.ts";
 import { readSellForm, saveSellRequest, MAX_PHOTOS, DIAL_CODES, type SellRequest, type SellErrors } from "../lib/leads.ts";
 
 const copy = brand.copy.sell;
@@ -49,9 +50,10 @@ const hasErrors = Object.keys(errors).length > 0;
 const sales = brand.contact.phones[0];
 const whatsapp = brand.contact.whatsapp ? `https://wa.me/${brand.contact.whatsapp}` : "";
 
-// The side photo: the featured car's cover for now.
+// The side photo: one uploaded in Admin, Page photos, else a car from stock.
 const cars = await listCars();
-const sidePhoto = cars.find((c) => c.status !== "sold" && c.photos.length)?.photos[0];
+const side = (await getPagePhotos()).sellSide;
+const sidePhoto = side?.photo ?? cars.find((c) => c.status !== "sold" && c.photos.length)?.photos[0];
 
 const MAKES = [
   "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Citroën", "Ferrari", "Fiat", "Ford", "Jaguar",
@@ -251,8 +253,8 @@ const choices = {
       <aside class="side">
         <div class="card side-card">
           {sidePhoto && (
-            <div class="side-photo">
-              <CarPhoto photo={sidePhoto} fit="cover" sizes="400px" alt="" />
+            <div class="side-photo" style={side ? `--focus: ${side.focus}` : undefined}>
+              <CarPhoto photo={sidePhoto} fit="cover" sizes="400px" alt={side?.alt ?? ""} />
             </div>
           )}
           <div class="side-in">

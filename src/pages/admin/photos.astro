@@ -1,0 +1,272 @@
+---
+// Admin: page photos. Each place that shows a big photo, with its photo
+// (uploaded here) or "automatic" (from stock). Upload a new one to replace
+// it; tap the photo to choose the point that stays in view when a screen
+// crops it (the previews show the crops); "Use automatic" removes it.
+import Admin from "../../layouts/Admin.astro";
+import { hasDb } from "../../lib/db.ts";
+import { pick } from "../../lib/photos.ts";
+import { PLACES, getPagePhotos, isPlace, removePagePhoto, savePagePhoto } from "../../lib/page-photos.ts";
+
+const ready = hasDb();
+let error: { place: string; text: string } | undefined;
+
+if (ready && Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const place = String(form.get("place") ?? "");
+  if (isPlace(place)) {
+    if (form.get("intent") === "remove") {
+      await removePagePhoto(place);
+      return Astro.redirect(`/admin/photos?removed=${place}#${place}`, 303);
+    }
+    const file = form.get("photo");
+    const r = await savePagePhoto(place, {
+      file: file instanceof File && file.size > 0 ? file : undefined,
+      alt: String(form.get("alt") ?? ""),
+      focus: String(form.get("focus") ?? ""),
+    });
+    if (!r.error) return Astro.redirect(`/admin/photos?saved=${place}#${place}`, 303);
+    error = { place, text: r.error };
+    Astro.response.status = 400;
+  }
+}
+
+const photos = ready ? await getPagePhotos() : {};
+const saved = Astro.url.searchParams.get("saved");
+const removed = Astro.url.searchParams.get("removed");
+
+// How each place crops its photo, for the previews: [label, aspect ratio].
+const CROPS: Record<string, [string, string][]> = {
+  homeHero: [["Computer", "10 / 3"], ["Phone", "3 / 2"]],
+  homeSell: [["Shown whole", "3 / 2"]],
+  sellSide: [["As shown", "16 / 9"]],
+  aboutMain: [["As shown", "4 / 3"]],
+  aboutSecond: [["As shown", "4 / 3"]],
+};
+---
+
+<Admin title="Page photos" active="photos">
+  <div class="page">
+    <div>
+      <h1 class="admin-h1">Page photos</h1>
+      <p class="a-hint">The big photos on the homepage, Sell your car and About. Each shows a photo from your stock until you upload one for it. Landscape photos at least 2000 pixels wide look best.</p>
+    </div>
+    {!ready && <p class="a-note">The database isn't set up yet: add <code>MONGODB_URI</code> to <code>.env</code>, then restart the site.</p>}
+
+    {ready && PLACES.map((p) => {
+      const current = photos[p.key];
+      const focus = current?.focus ?? "50% 50%";
+      const [fx, fy] = focus.split(" ");
+      const err = error?.place === p.key ? error.text : undefined;
+      // Photos that won't suit the place: too small for the full-width hero,
+      // or portrait (the pages show landscape shapes, so most would be cut).
+      const warn = !current
+        ? undefined
+        : current.photo.height > current.photo.width && p.key !== "homeSell"
+          ? "This is a portrait photo: the page crops most of it away. A landscape photo works better here."
+          : p.key === "homeHero" && current.photo.width < 1600
+            ? `This photo is ${current.photo.width} pixels wide, so it may look soft across a large screen. One at least 2000 pixels wide is best.`
+            : undefined;
+      return (
+        <section class="admin-box place" id={p.key} aria-labelledby={`${p.key}-h`}>
+          <div class="place-head">
+            <h2 id={`${p.key}-h`}>{p.label}</h2>
+            <a class="a-hint" href={p.page} target="_blank" rel="noopener">See the page</a>
+          </div>
+          {saved === p.key && <p class="a-note" role="status">Saved. It's on the site now.</p>}
+          {removed === p.key && <p class="a-note" role="status">Back to automatic.</p>}
+          {err && <p class="a-err" role="alert">{err}</p>}
+          {warn && <p class="warn">{warn}</p>}
+
+          <form method="post" enctype="multipart/form-data" class="place-form">
+            <input type="hidden" name="place" value={p.key} />
+            <input type="hidden" name="focus" value={focus} />
+            {current ? (
+              <div class="previews" style={`--focus: ${focus}`}>
+                <button type="button" class="pick" aria-label="Tap the photo where it should stay in view">
+                  <img src={pick(current.photo.avif, 800).url} alt="" />
+                  <span class="dot" style={`left: ${fx}; top: ${fy}`} aria-hidden="true"></span>
+                </button>
+                {p.key !== "homeSell" && (
+                  <div class="crops">
+                    {CROPS[p.key].map(([label, ratio]) => (
+                      <figure>
+                        <div class="crop" style={`aspect-ratio: ${ratio}`}>
+                          <img src={pick(current.photo.avif, 800).url} alt="" />
+                        </div>
+                        <figcaption class="a-hint">{label}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p class="auto">Automatic: shows {p.automatic}.</p>
+            )}
+            {current && p.key !== "homeSell" && <p class="a-hint">Tap the photo on the left where it should stay in view; the crops show how pages cut it. Then save.</p>}
+
+            <div class="fields">
+              <div>
+                <label class="a-lbl" for={`${p.key}-file`}>{current ? "Replace with a new photo" : "Upload a photo"}</label>
+                <input id={`${p.key}-file`} name="photo" type="file" accept="image/*" />
+              </div>
+              <div>
+                <label class="a-lbl" for={`${p.key}-alt`}>What it shows <span class="a-opt">(for screen readers and Google)</span></label>
+                <input class="a-in" id={`${p.key}-alt`} name="alt" value={current?.alt} placeholder="Our showroom with three cars inside" />
+              </div>
+            </div>
+            <div class="btns">
+              <button class="a-btn pri" type="submit" name="intent" value="save">Save</button>
+              {current && <button class="a-btn" type="submit" name="intent" value="remove" formnovalidate>Use automatic</button>}
+            </div>
+          </form>
+        </section>
+      );
+    })}
+  </div>
+</Admin>
+
+<script>
+  // Tap to set the focus point: the dot moves, the crops follow, and the
+  // hidden field is saved with the form.
+  document.querySelectorAll<HTMLFormElement>(".place-form").forEach((form) => {
+    const pick = form.querySelector<HTMLButtonElement>(".pick");
+    if (!pick) return;
+    const field = form.querySelector<HTMLInputElement>('input[name="focus"]')!;
+    const dot = pick.querySelector<HTMLElement>(".dot")!;
+    const previews = form.querySelector<HTMLElement>(".previews")!;
+    const set = (x: number, y: number) => {
+      const fx = `${Math.round(Math.min(100, Math.max(0, x)))}%`;
+      const fy = `${Math.round(Math.min(100, Math.max(0, y)))}%`;
+      field.value = `${fx} ${fy}`;
+      dot.style.left = fx;
+      dot.style.top = fy;
+      previews.style.setProperty("--focus", field.value);
+    };
+    pick.addEventListener("click", (e) => {
+      const r = pick.getBoundingClientRect();
+      if (e.detail === 0) return; // keyboard: arrows below
+      set(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+    });
+    // Keyboard: arrow keys move the point in steps of 5%.
+    pick.addEventListener("keydown", (e) => {
+      const [x, y] = field.value.split(" ").map((v) => parseFloat(v));
+      const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, -5], ArrowDown: [0, 5] }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      set(x + step[0], y + step[1]);
+    });
+  });
+</script>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    max-width: 1000px;
+  }
+  .place {
+    scroll-margin-top: 16px;
+  }
+  .place-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 16px;
+  }
+  .place-head h2 {
+    margin: 0;
+    font: 700 22px/1.15 var(--font-display);
+  }
+  .place-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .warn {
+    margin: 0;
+    padding: 10px 14px;
+    background: #fdf0d5;
+    color: #6b4200;
+    font-size: 15px;
+  }
+  .auto {
+    margin: 0;
+    padding: 18px;
+    border: 1px dashed var(--color-line);
+    color: var(--color-muted);
+  }
+  .previews {
+    display: grid;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (min-width: 760px) {
+    .previews {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+  }
+  .pick {
+    position: relative;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: var(--color-line);
+    cursor: crosshair;
+  }
+  .pick img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .dot {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    margin: -13px 0 0 -13px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: var(--color-accent);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.4);
+    pointer-events: none;
+  }
+  .crops {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .crops figure {
+    margin: 0;
+  }
+  .crop {
+    overflow: hidden;
+    background: var(--color-line);
+  }
+  .crop img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--focus);
+  }
+  .crops figcaption {
+    margin: 4px 0 0;
+  }
+  .fields {
+    display: grid;
+    gap: 14px;
+  }
+  @media (min-width: 760px) {
+    .fields {
+      grid-template-columns: 1fr 1fr;
+      align-items: end;
+    }
+  }
+  .btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+</style>

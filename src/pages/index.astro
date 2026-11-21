@@ -9,13 +9,22 @@ import CarPhoto from "../components/CarPhoto.astro";
 import { brand } from "../brands/index.ts";
 import { listCars, makesInStock, specsLine, priceLabel } from "../lib/cars.ts";
 import { getSitePhotos } from "../lib/site.ts";
+import { getPagePhotos } from "../lib/page-photos.ts";
 
 const allCars = await listCars();
 const forSale = allCars.filter((c) => c.status !== "sold");
 const site = await getSitePhotos();
 
+// Page photos uploaded in the admin (src/lib/page-photos.ts) replace the
+// automatic ones: the featured car's photo in the hero, the sell band's.
+const pagePhotos = await getPagePhotos();
+
 const featured = forSale.find((c) => c.slug === site.featured) ?? forSale.find((c) => c.photos.length);
-const heroPhoto = featured && (featured.photos[site.heroPhoto ?? 0] ?? featured.photos[0]);
+const carHero = featured && (featured.photos[site.heroPhoto ?? 0] ?? featured.photos[0]);
+const heroPhoto = pagePhotos.homeHero?.photo ?? carHero;
+const heroAlt = pagePhotos.homeHero ? pagePhotos.homeHero.alt : featured ? `${featured.make} ${featured.model}` : "";
+const heroFocus = pagePhotos.homeHero?.focus ?? site.heroFocus ?? "50% 60%";
+const sellPhoto = pagePhotos.homeSell?.photo ?? site.sell;
 const grid = forSale.filter((c) => c !== featured).slice(0, 6);
 
 // Up to five makes, then a link to them all.
@@ -39,14 +48,14 @@ const services = [
   <main>
     {featured && heroPhoto && (
       <>
-        <section class="hero" aria-label="Featured car" style={`--focus: ${site.heroFocus ?? "50% 60%"}`}>
+        <section class="hero" aria-label="Featured car" style={`--focus: ${heroFocus}`}>
           <CarPhoto
             class="hero-img"
             photo={heroPhoto}
             fit="cover"
             sizes="100vw"
             priority
-            alt={`${featured.make} ${featured.model}`}
+            alt={heroAlt}
           />
           <div class="hero-shade"></div>
           <div class="hero-text">
@@ -118,9 +127,9 @@ const services = [
 
     <section id="sell" class="sell">
       <div class="wrap sell-in">
-        {site.sell && (
+        {sellPhoto && (
           <div class="sell-photo">
-            <CarPhoto photo={site.sell} fit="contain" sizes="(min-width: 980px) 596px, calc(100vw - 32px)" alt="" />
+            <CarPhoto photo={sellPhoto} fit="contain" sizes="(min-width: 980px) 596px, calc(100vw - 32px)" alt={pagePhotos.homeSell?.alt ?? ""} />
           </div>
         )}
         <div class="sell-copy">

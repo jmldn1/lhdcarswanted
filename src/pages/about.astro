@@ -8,6 +8,7 @@ import SellBand from "../components/SellBand.astro";
 import { brand } from "../brands/index.ts";
 import { listCars } from "../lib/cars.ts";
 import { getSitePhotos } from "../lib/site.ts";
+import { getPagePhotos, type PagePhoto } from "../lib/page-photos.ts";
 
 const about = brand.copy.about;
 if (!about) return new Response(null, { status: 404 });
@@ -16,8 +17,14 @@ const steps = brand.features.sellForm ? brand.copy.sell?.steps ?? [] : [];
 const cars = await listCars();
 const site = await getSitePhotos();
 const withPhotos = cars.filter((c) => c.photos.length);
-const lead = withPhotos.find((c) => c.slug === site.featured) ?? withPhotos[0];
-const second = withPhotos.find((c) => c !== lead);
+const leadCar = withPhotos.find((c) => c.slug === site.featured) ?? withPhotos[0];
+const secondCar = withPhotos.find((c) => c !== leadCar);
+// Photos uploaded in Admin, Page photos, else cars from stock.
+const pagePhotos = await getPagePhotos();
+const carPhoto = (c: (typeof cars)[number] | undefined): PagePhoto | undefined =>
+  c && { photo: c.photos[0], alt: `${c.make} ${c.model}`, focus: "50% 50%" };
+const lead = pagePhotos.aboutMain ?? carPhoto(leadCar);
+const second = pagePhotos.aboutSecond ?? carPhoto(secondCar);
 ---
 
 <Base title="About us" description={about.intro} flush>
@@ -33,8 +40,8 @@ const second = withPhotos.find((c) => c !== lead);
         </div>
       </div>
       {lead && (
-        <div class="pic">
-          <CarPhoto photo={lead.photos[0]} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={`${lead.make} ${lead.model}`} />
+        <div class="pic" style={`--focus: ${lead.focus}`}>
+          <CarPhoto photo={lead.photo} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={lead.alt} />
         </div>
       )}
     </section>
@@ -66,8 +73,8 @@ const second = withPhotos.find((c) => c !== lead);
     {about.story.length > 0 && (
       <section class="wrap split" aria-labelledby="story-h">
         {second && (
-          <div class="pic">
-            <CarPhoto photo={second.photos[0]} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={`${second.make} ${second.model}`} />
+          <div class="pic" style={`--focus: ${second.focus}`}>
+            <CarPhoto photo={second.photo} fit="cover" sizes="(min-width: 960px) 596px, calc(100vw - 32px)" alt={second.alt} />
           </div>
         )}
         <div class="story">
