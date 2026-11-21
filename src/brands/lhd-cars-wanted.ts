@@ -85,5 +85,5 @@ export const lhdCarsWanted: Brand = {
     blogIntro: "[Blog intro: what you write about, in a sentence or two]",
     contactIntro: "Call, WhatsApp or email us, or send a message below. [We usually reply within REPLY TIME.]",
   },
-  cardPhoto: { fit: "contain", ratio: "3 / 2" },
+  cardPhoto: { fit: "cover", ratio: "3 / 2" },
 };

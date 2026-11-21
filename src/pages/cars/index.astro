@@ -10,11 +10,8 @@ const makeParam = Astro.url.searchParams.get("make");
 const cars = makeParam ? allCars.filter((c) => makeSlug(c.make) === makeParam) : allCars;
 const makeName = makeParam ? cars[0]?.make : undefined;
 
-// How photos sit in the card frame comes from the brand. While we're still
-// choosing, ?fit=contain|cover overrides it and the dev build shows a switch.
-const q = Astro.url.searchParams.get("fit");
-const fit = q === "cover" || q === "contain" ? q : brand.cardPhoto.fit;
-const showSwitch = import.meta.env.DEV || q !== null;
+// How photos sit in the card frame comes from the brand (cover: they fill it).
+const fit = brand.cardPhoto.fit;
 ---
 
 <Base title={brand.copy.carsTitle} description={brand.copy.carsIntro}>
@@ -28,14 +25,6 @@ const showSwitch = import.meta.env.DEV || q !== null;
         </p>
       )}
     </header>
-
-    {showSwitch && (
-      <div class="switch" role="group" aria-label="Photo framing (for choosing)">
-        <span>Card photos:</span>
-        <a href={`?${makeParam ? `make=${makeParam}&` : ""}fit=contain`} aria-current={fit === "contain" ? "true" : undefined}>Whole photo</a>
-        <a href={`?${makeParam ? `make=${makeParam}&` : ""}fit=cover`} aria-current={fit === "cover" ? "true" : undefined}>Fill the frame</a>
-      </div>
-    )}
 
     {cars.length ? (
       <div class="grid">
@@ -90,26 +79,6 @@ const showSwitch = import.meta.env.DEV || q !== null;
     margin: 0;
     color: var(--color-muted);
     max-width: 62ch;
-  }
-  .switch {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 16px;
-    font-size: 14px;
-    color: var(--color-muted);
-  }
-  .switch a {
-    padding: 6px 10px;
-    border: 1px solid var(--color-line);
-    color: var(--color-fg);
-    text-decoration: none;
-    background: var(--color-surface);
-  }
-  .switch a[aria-current] {
-    border-color: var(--color-accent);
-    box-shadow: inset 0 0 0 1px var(--color-accent);
   }
   .grid {
     display: grid;
