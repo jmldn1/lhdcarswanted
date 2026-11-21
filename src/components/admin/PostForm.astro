@@ -4,6 +4,7 @@
 import type { Post } from "../../lib/blog.ts";
 import type { PostErrors } from "../../lib/post-form.ts";
 import { pick } from "../../lib/photos.ts";
+import { aiReady } from "../../lib/ai.ts";
 
 interface Props {
   post: Post;
@@ -13,6 +14,9 @@ interface Props {
 }
 const { post, errors, categories, mode } = Astro.props;
 const err = (k: keyof PostErrors) => errors[k];
+// The AI box shows only when it's set up (ANTHROPIC_API_KEY).
+const ai = aiReady();
+const SPARK = "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z";
 ---
 
 <form method="post" enctype="multipart/form-data" class="post-form" novalidate>
@@ -49,6 +53,30 @@ const err = (k: keyof PostErrors) => errors[k];
     </div>
 
     <div class="col-side">
+      {ai && (
+        <section class="admin-box ai-box" aria-labelledby="ai-h">
+          <h2 id="ai-h">Write with AI</h2>
+          <p class="a-hint">It fills in the post for you to check; nothing is saved until you save. Anything about the business it doesn't know is left as a [PLACEHOLDER].</p>
+          <div class="ai-btns">
+            <button type="button" class="a-btn pri" data-mode="draft" title="Write the whole post from the title and your notes in the post box">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d={SPARK} /></svg><span class="ai-label">Draft from my notes</span>
+            </button>
+            <button type="button" class="a-btn" data-mode="polish"><span class="ai-label">Polish</span></button>
+            <button type="button" class="a-btn" data-mode="shorten"><span class="ai-label">Shorten</span></button>
+            <button type="button" class="a-btn" data-mode="headline"><span class="ai-label">Suggest titles</span></button>
+          </div>
+          <div class="ai-row">
+            <button type="button" class="a-btn" id="ai-undo" hidden>Undo</button>
+            <p class="a-hint" id="ai-status" aria-live="polite"></p>
+          </div>
+          <div id="ai-ideas" hidden>
+            <span class="a-lbl">Titles</span>
+            <ul class="ideas" id="ai-titles"></ul>
+            <span class="a-lbl">Intro</span>
+            <ul class="ideas" id="ai-intro"></ul>
+          </div>
+        </section>
+      )}
       <section class="admin-box" aria-labelledby="pub-h">
         <h2 id="pub-h">Publishing</h2>
         <fieldset>
@@ -104,7 +132,118 @@ const err = (k: keyof PostErrors) => errors[k];
   </div>
 </form>
 
+<script>
+  import { askAi, busy } from "../../scripts/admin-ai.ts";
+
+  // Write with AI: draft, polish, shorten (each replaces the post, with Undo)
+  // or suggest titles and an intro to pick from.
+  const box = document.querySelector<HTMLElement>(".ai-box");
+  if (box) {
+    const title = document.querySelector<HTMLInputElement>("#p-title")!;
+    const intro = document.querySelector<HTMLTextAreaElement>("#p-intro")!;
+    const body = document.querySelector<HTMLTextAreaElement>("#p-body")!;
+    const status = box.querySelector<HTMLElement>("#ai-status")!;
+    const undo = box.querySelector<HTMLButtonElement>("#ai-undo")!;
+    const ideas = box.querySelector<HTMLElement>("#ai-ideas")!;
+    let before: [string, string, string] | null = null;
+    const LABEL: Record<string, string> = { draft: "Writing…", polish: "Polishing…", shorten: "Shortening…", headline: "Thinking…" };
+
+    // One suggestion, with a Use button that puts it in the field.
+    const idea = (text: string, field: HTMLInputElement | HTMLTextAreaElement) => {
+      const li = document.createElement("li");
+      const span = document.createElement("span");
+      span.textContent = text;
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "a-btn";
+      use.textContent = "Use";
+      use.addEventListener("click", () => {
+        before = [title.value, intro.value, body.value];
+        field.value = text;
+        undo.hidden = false;
+        status.textContent = "Done. Check it, then save.";
+      });
+      li.append(span, use);
+      return li;
+    };
+
+    box.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode!;
+        return busy(btn, LABEL[mode], status, async () => {
+          const r = await askAi<{ title?: string; intro?: string; body?: string; titles?: string[] }>({
+            task: "blog",
+            mode,
+            title: title.value,
+            intro: intro.value,
+            body: body.value,
+          });
+          if (mode === "headline") {
+            box.querySelector("#ai-titles")!.replaceChildren(...(r.titles ?? []).map((t) => idea(t, title)));
+            box.querySelector("#ai-intro")!.replaceChildren(...(r.intro ? [idea(r.intro, intro)] : []));
+            ideas.hidden = false;
+            return "Pick any you like.";
+          }
+          before = [title.value, intro.value, body.value];
+          if (r.title) title.value = r.title;
+          if (r.intro) intro.value = r.intro;
+          if (r.body) body.value = r.body;
+          undo.hidden = false;
+          return "Done. Check it, then save.";
+        });
+      }),
+    );
+    undo.addEventListener("click", () => {
+      if (before) [title.value, intro.value, body.value] = before;
+      undo.hidden = true;
+      status.textContent = "Put back as it was.";
+    });
+  }
+</script>
+
 <style>
+  .ai-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ai-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+  .ai-row .a-hint {
+    margin: 0;
+  }
+  #ai-ideas {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  #ai-ideas[hidden] {
+    display: none;
+  }
+  .ideas {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+  }
+  .ideas li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-line);
+    background: var(--color-bg);
+  }
+  .ideas span {
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
   .post-form {
     display: flex;
     flex-direction: column;

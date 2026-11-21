@@ -44,6 +44,23 @@ location /photos/ {
 
 (`src/pages/photos/[...path].ts` serves them when nginx doesn't.)
 
+Upload size: a new car's Save sends up to 20 photos of up to 30 MB each in
+one request (`MAX_UPLOAD_COUNT`, `MAX_UPLOAD_BYTES` in
+`src/lib/photo-queue.ts`); an edit sends one photo per request. nginx refuses
+anything over 1 MB by default, so the site's server block needs the same
+`client_max_body_size` and `proxy_*_timeout` values as London LHD Centre v1's
+preview site, which handles the same uploads (find them with
+`sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"`). Values:
+**[TO COPY FROM V1]**.
+
+Walkaround videos: a car can have a YouTube or Vimeo link, or the https
+address of an .mp4/.webm file (`src/lib/video.ts`). The car's page shows one
+of its photos as the poster; nothing from the video's host loads until
+someone presses play, and then it plays full screen (`src/scripts/video.ts`).
+If a Content-Security-Policy is ever added, it needs `frame-src
+https://www.youtube-nocookie.com https://player.vimeo.com` (and `media-src`
+for a file's host).
+
 ## Test stock
 
 Test stock comes from the old site's code (the private "mercury" repository).
@@ -104,3 +121,6 @@ its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 | `SESSION_SECRET` | (none) | Signs the admin's sign-in cookie; set by `npm run admin:password` |
 | `DATA_DIR` | `data` | Test stock file and uploaded photos' originals |
 | `LEADS_DIR` | `data/leads` | Where sell requests (with their photos) and enquiries are saved. Customer data: outside the app folder in production, never in git |
+| `ANTHROPIC_API_KEY` | (none) | The admin's AI writing help (`src/lib/ai.ts`); without it the AI buttons don't show |
+| `AI_MODEL` | `claude-opus-5-5` | The Claude model the AI help uses |
+| `AI_DAILY_LIMIT` | `300` | AI requests a day (a cap on spending; counts again after a restart) |

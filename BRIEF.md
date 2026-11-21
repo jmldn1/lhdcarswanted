@@ -90,7 +90,11 @@ site. Started 18 November 2026.
    made web-ready in the background) and leads (sell requests and
    enquiries, with a stage and notes). Cars are in this site's own MongoDB
    database (`lhdcarswanted`); leads stay as files in `LEADS_DIR`. Not built
-   yet: cars wanted, homepage photos (hero choice and focus) and settings.
+   yet: cars wanted and settings. Page photos *built 21 Nov 2026* (Admin,
+   Photos): a simpler take on v1's hero library. Each big photo (homepage
+   hero and sell band, Sell your car, About's two) shows a car from stock
+   until one is uploaded for it, with a tapped focus point and previews of
+   the crops.
 7. Blog, About and Contact: built 20 Nov 2026 from the mockups
    (https://claude.ai/artifact/313rhG5NV8wtcR9D6iDMHQ). Posts are written in
    the admin (Blog) and kept in the database; Contact messages go to the
@@ -112,3 +116,11 @@ site. Started 18 November 2026.
    which is for development; a business website needs a lightGallery
    commercial licence (its key then goes in the `licenseKey` setting), or
    the full screen switches to a free one such as PhotoSwipe.
+8. Photo uploads on the VPS, *decided 21 Nov 2026:* do as London LHD Centre
+   v1 does. Up to 20 photos (30 MB each) go up with a new car's Save
+   (more are added after saving, one at a time); they're made web-ready in
+   the background. nginx must allow that size of request and its timeouts,
+   or uploads fail: use the same `client_max_body_size` and `proxy_*_timeout`
+   values as v1's preview site. **Waiting on:** those values, from
+   `sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"` on the
+   VPS (README, "The admin").

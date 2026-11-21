@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import type { Photo } from "./photos.ts";
+import type { CarVideo } from "./video.ts";
 import { db, hasDb } from "./db.ts";
 
 export type CarStatus = "draft" | "available" | "reserved" | "sold";
@@ -34,6 +35,8 @@ export interface Car {
   description: string;
   status: CarStatus;
   photos: Photo[];
+  /** A walkaround video (a YouTube or Vimeo link, or a video file's address). */
+  video?: CarVideo;
   /** Photos uploaded but not web-ready yet (the admin shows them). */
   pending?: Pending[];
   createdAt?: string;
@@ -105,6 +108,11 @@ export async function addPhoto(id: string, photo: Photo, pendingId: string): Pro
     { _id: id },
     { $push: { photos: photo }, $pull: { pending: { id: pendingId } }, $set: { updatedAt: new Date().toISOString() } },
   );
+}
+
+/** Sets one photo's alt text (what it shows). */
+export async function setPhotoAlt(id: string, photoId: string, alt: string): Promise<void> {
+  await (await cars()).updateOne({ _id: id, "photos.id": photoId }, { $set: { "photos.$.alt": alt } });
 }
 
 export async function addPending(id: string, items: Pending[]): Promise<void> {

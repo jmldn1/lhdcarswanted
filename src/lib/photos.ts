@@ -37,6 +37,8 @@ export interface Photo {
   placeholder: string;
   avif: PhotoVariant[];
   jpg: PhotoVariant[];
+  /** What the photo shows, for screen readers and search engines (written by the admin's AI). */
+  alt?: string;
 }
 
 export interface PhotoStore {

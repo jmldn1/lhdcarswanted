@@ -9,12 +9,17 @@
 import Base from "../../layouts/Base.astro";
 import CarPhoto from "../../components/CarPhoto.astro";
 import CarCard from "../../components/CarCard.astro";
+import CarDescription from "../../components/CarDescription.astro";
 import { brand } from "../../brands/index.ts";
 import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../../lib/cars.ts";
 import { lightboxJson } from "../../lib/lightbox.ts";
+import { pageVideo } from "../../lib/video.ts";
 
 const car = await getCar(Astro.params.slug ?? "");
 if (!car) return new Response(null, { status: 404 });
+// The walkaround video, if the car has one: first in the thumbnails, and a
+// button in the card. Only its poster (one of the car's photos) loads with the page.
+const video = pageVideo(car);
 
 // The facts the car's record has.
 const facts = carFacts(car);
@@ -50,7 +55,7 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
                   photo={p}
                   fit="contain"
                   priority={i === 0}
-                  alt={`${car.make} ${car.model}, photo ${i + 1} of ${car.photos.length}`}
+                  alt={p.alt ?? `${car.make} ${car.model}, photo ${i + 1} of ${car.photos.length}`}
                   sizes="(min-width: 1240px) 780px, (min-width: 960px) 62vw, calc(100vw - 32px)"
                   style={i === 0 ? `view-transition-name: car-${car.id}` : undefined}
                 />
@@ -75,8 +80,17 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
             </>
           )}
         </div>
-        {car.photos.length > 1 && (
+        {(car.photos.length > 1 || video) && (
           <div class="thumbs">
+            {video && (
+              <button type="button" class="thumb vthumb" data-video aria-label={video.label}>
+                {video.poster && <CarPhoto photo={video.poster} fit="cover" sizes="(min-width: 960px) 180px, 27vw" />}
+                <span class="vmark" aria-hidden="true">
+                  <span class="vplay"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+                  Video{video.length && ` ${video.length}`}
+                </span>
+              </button>
+            )}
             {car.photos.map((p, i) => (
               <button type="button" class="thumb" data-i={i} aria-label={`Show photo ${i + 1}`} aria-current={i === 0 ? "true" : undefined}>
                 <CarPhoto photo={p} fit="cover" sizes="(min-width: 960px) 180px, 27vw" />
@@ -85,6 +99,7 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
           </div>
         )}
         <script type="application/json" id="lightbox-photos" set:html={lightboxJson(car)} />
+        {video && <script type="application/json" id="car-video" set:html={video.json} />}
       </section>
 
       <aside class="card" aria-label="Price and details">
@@ -114,6 +129,12 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
             Enquire
           </a>
         </div>
+        {video && (
+          <button class="btn big watch" type="button" data-video>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M7 4.5v15l13-7.5z" /></svg>
+            Watch the walkaround video{video.length && <span class="len">{video.length}</span>}
+          </button>
+        )}
         {facts.length > 0 && (
           <dl class="facts">
             {facts.map(([k, v]) => (
@@ -130,7 +151,7 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
       {car.description && (
         <section class="about" aria-labelledby="about-h">
           <h2 id="about-h">About this car</h2>
-          <p>{car.description}</p>
+          <CarDescription text={car.description} />
         </section>
       )}
     </div>
@@ -169,12 +190,16 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
 
 <script>
   import { openLightbox } from "../../scripts/lightbox.ts";
+  import { wireVideo } from "../../scripts/video.ts";
+
+  wireVideo();
 
   // Arrows, counter and thumbnails for the native strip (swipe and scroll need no script).
   const strip = document.querySelector<HTMLElement>(".strip");
   const n = document.querySelector(".counter .n");
   const row = document.querySelector<HTMLElement>(".thumbs");
-  const thumbs = [...document.querySelectorAll<HTMLButtonElement>(".thumb")];
+  // The photos' thumbnails (not the video's).
+  const thumbs = [...document.querySelectorAll<HTMLButtonElement>(".thumb:not(.vthumb)")];
   if (strip) {
     const go = (i: number) => strip.scrollTo({ left: i * strip.clientWidth, behavior: "smooth" });
     const current = () => Math.round(strip.scrollLeft / strip.clientWidth);
@@ -413,6 +438,49 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
   .thumb[aria-current="true"]::after {
     outline-color: var(--color-accent);
   }
+  /* The video's thumbnail: its poster, darkened, with a play mark. */
+  .vthumb {
+    overflow: hidden;
+  }
+  .vmark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: color-mix(in srgb, var(--color-fg) 50%, transparent);
+    color: #fff;
+    font: 700 13px/1.1 var(--font-body);
+  }
+  .vplay {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--color-fg);
+    transition: transform 0.2s ease;
+  }
+  .vthumb:hover .vplay {
+    transform: scale(1.08);
+  }
+  .vplay svg {
+    width: 14px;
+    height: 14px;
+    margin-left: 2px;
+    fill: currentColor;
+  }
+  .watch .fill {
+    fill: currentColor;
+    stroke: none;
+  }
+  .watch .len {
+    color: var(--color-muted);
+    font-weight: 600;
+  }
   .card {
     grid-area: card;
     align-self: start;
@@ -549,11 +617,8 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
     font: 700 30px/1.1 var(--font-display);
     margin: 0 0 14px;
   }
-  .about p {
-    margin: 0;
+  .about {
     font-size: 17px;
-    white-space: pre-line;
-    overflow-wrap: anywhere;
   }
   /* "Talk to us": the dark band, as on the homepage's sell band. */
   .talk {

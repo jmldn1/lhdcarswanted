@@ -10,9 +10,12 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { db } from "./db.ts";
 import { addPending, addPhoto, dropPending, type Car } from "./cars.ts";
+import { describeLater } from "./photo-alt.ts";
 import { processPhoto, photoStore, type Photo } from "./photos.ts";
 
 export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+/** Photos taken in one save, as on London LHD Centre v1 (nginx's upload limit is sized for it: README). */
+export const MAX_UPLOAD_COUNT = 20;
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/avif": "avif",
 };
@@ -30,6 +33,7 @@ export function checkUploads(files: File[]): { ok: File[]; refused: string[] } {
   for (const f of files) {
     if (!f.type.startsWith("image/")) refused.push(`${f.name}: not a photo`);
     else if (f.size > MAX_UPLOAD_BYTES) refused.push(`${f.name}: over 30 MB`);
+    else if (ok.length >= MAX_UPLOAD_COUNT) refused.push(`${f.name}: ${MAX_UPLOAD_COUNT} photos at a time; add it after saving`);
     else ok.push(f);
   }
   return { ok, refused };
@@ -75,6 +79,8 @@ async function work() {
     try {
       const photo = await processPhoto(original, photoStore(), carId, next.id);
       await addPhoto(carId, photo, next.id);
+      // Its alt text, in the background (when AI is set up).
+      void describeLater(carId).catch(() => {});
     } catch (e) {
       // Not a photo sharp can read (or the original is gone): drop it.
       console.error(`photo ${next.id} of ${carId} failed:`, e instanceof Error ? e.message : e);

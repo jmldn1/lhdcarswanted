@@ -1,8 +1,9 @@
 // Reads and checks the admin's add/edit car form. Photos are handled apart
 // (src/lib/photo-queue.ts); this is the car's details.
 import type { Car, CarStatus } from "./cars.ts";
+import { videoSource, LENGTH } from "./video.ts";
 
-export type CarErrors = Partial<Record<"make" | "model" | "year" | "price" | "photos", string>>;
+export type CarErrors = Partial<Record<"make" | "model" | "year" | "price" | "photos" | "video" | "videoLength", string>>;
 
 const STATUSES: CarStatus[] = ["draft", "available", "reserved", "sold"];
 const text = (form: FormData, key: string, max = 200) => String(form.get(key) ?? "").trim().slice(0, max);
@@ -14,6 +15,9 @@ export function readCarForm(form: FormData, base: Car): { car: Car; errors: CarE
   const gearbox = text(form, "gearbox");
   const steering = text(form, "steering");
   const status = text(form, "status") as CarStatus;
+  const videoUrl = text(form, "videoUrl", 500);
+  const videoLength = text(form, "videoLength", 8);
+  const poster = text(form, "videoPoster", 40);
 
   const car: Car = {
     ...base,
@@ -29,6 +33,9 @@ export function readCarForm(form: FormData, base: Car): { car: Car; errors: CarE
     price: poa || !priceText ? null : Number(priceText),
     description: text(form, "description", 10000),
     status: STATUSES.includes(status) ? status : "draft",
+    video: videoUrl
+      ? { url: videoUrl, length: videoLength || undefined, poster: /^[a-z0-9]+$/i.test(poster) ? poster : undefined }
+      : undefined,
   };
 
   const errors: CarErrors = {};
@@ -37,6 +44,10 @@ export function readCarForm(form: FormData, base: Car): { car: Car; errors: CarE
   if (car.year && !/^(19|20)\d\d$/.test(car.year)) errors.year = "Enter a year like 2015";
   if (!poa && priceText && !/^\d{1,9}$/.test(priceText)) errors.price = "Numbers only, like 65000";
   if (!poa && !priceText && car.status !== "draft") errors.price = "Enter a price, or tick POA";
+  if (videoUrl && !videoSource(videoUrl)) {
+    errors.video = "Paste a YouTube or Vimeo link, or the web address of an .mp4 file";
+  }
+  if (videoLength && !LENGTH.test(videoLength)) errors.videoLength = "Minutes and seconds, like 2:14";
   return { car, errors, featured: form.get("featured") === "on" };
 }
 

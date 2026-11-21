@@ -15,7 +15,7 @@ export function lightboxJson(car: Car): string {
     sizes: "100vw",
     sources: [{ type: "image/avif", srcset: srcset(p.avif), sizes: "100vw" }],
     thumb: pick(p.avif, 200).url,
-    alt: `${name}, photo ${i + 1} of ${car.photos.length}`,
+    alt: p.alt ?? `${name}, photo ${i + 1} of ${car.photos.length}`,
     subHtml: `<p>${esc(name)}</p>`,
   }));
   // Safe inside <script>: no "</script>" can appear.

@@ -10,6 +10,7 @@
 import type { Car } from "../../lib/cars.ts";
 import type { CarErrors } from "../../lib/car-form.ts";
 import { pick } from "../../lib/photos.ts";
+import { aiReady } from "../../lib/ai.ts";
 
 interface Props {
   car: Car;
@@ -27,6 +28,9 @@ const STATUS: [Car["status"], string, string][] = [
   ["sold", "Sold", "Stays on the site with a Sold label."],
 ];
 const pending = car.pending ?? [];
+// The AI buttons show only when it's set up (ANTHROPIC_API_KEY).
+const ai = aiReady();
+const described = car.photos.filter((p) => p.alt).length;
 ---
 
 <form method="post" enctype="multipart/form-data" class="car-form" data-mode={mode} data-car={car.id} novalidate>
@@ -51,14 +55,14 @@ const pending = car.pending ?? [];
       </label>
       <span class="chosen a-hint" aria-live="polite"></span>
     </div>
-    {mode === "new" && <p class="a-hint">They upload when you save, then are made web-ready in the background.</p>}
+    {mode === "new" && <p class="a-hint">Up to 20 photos (30 MB each) upload when you save, then are made web-ready in the background. Add more after saving.</p>}
     {refused.length > 0 && <p class="a-err" role="alert">Not added: {refused.join("; ")}</p>}
     {err("photos") && <p class="a-err" role="alert">{err("photos")}</p>}
 
     <input type="hidden" name="order" value={car.photos.map((p) => p.id).join(",")} />
     <ol class="photos">
       {car.photos.map((p, i) => (
-        <li class="ph" draggable="true" data-id={p.id}>
+        <li class="ph" draggable="true" data-id={p.id} title={p.alt}>
           <img src={pick(p.avif, 300).url} alt={`Photo ${i + 1}`} loading="lazy" />
           <span class="num" aria-hidden="true">{i + 1}</span>
           <span class="cover">Cover</span>
@@ -77,6 +81,15 @@ const pending = car.pending ?? [];
         </li>
       ))}
     </ol>
+    {ai && mode === "edit" && car.photos.length > 0 && (
+      <div class="ai-row">
+        <button type="button" class="a-btn ai-btn" id="ai-alt" disabled={described === car.photos.length}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>
+          <span class="ai-label">Describe the photos with AI</span>
+        </button>
+        <span class="a-hint" id="ai-alt-status" aria-live="polite">{described} of {car.photos.length} described (for screen readers and Google). New photos are described as they're added; point at a photo to see its text.</span>
+      </div>
+    )}
   </section>
 
   <div class="cols">
@@ -140,6 +153,64 @@ const pending = car.pending ?? [];
           <label class="a-lbl" for="f-desc">Shown under the photos on the car's page</label>
           <textarea class="a-in" id="f-desc" name="description" rows="7">{car.description}</textarea>
         </div>
+        {ai && (
+          <>
+            <div class="ai-row">
+              <button type="button" class="a-btn ai-btn" id="ai-desc">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>
+                <span class="ai-label">{car.description ? "Polish with AI" : "Write with AI"}</span>
+              </button>
+              <button type="button" class="a-btn" id="ai-desc-undo" hidden>Undo</button>
+              <label class="check bg-check"><input type="checkbox" id="ai-desc-bg" /> Add model background</label>
+              <span class="a-hint" id="ai-desc-status" aria-live="polite"></span>
+            </div>
+            <p class="a-hint">Type or dictate your notes in any form (history, owners, service, documents, equipment, condition), then <strong>Polish with AI</strong>: it rewrites them keeping every fact and adding nothing, as an opening paragraph, "Highlights:" with a line for each point, and a closing line. With no notes it writes a short description from the details. <strong>Add model background</strong> lets it add a sentence or two about the model in general: check those especially. Check it all before saving.</p>
+          </>
+        )}
+      </section>
+
+      {ai && (
+        <section class="admin-box" aria-labelledby="soc-h">
+          <h2 id="soc-h">Social media captions</h2>
+          <p class="a-hint">Three caption ideas for Instagram or Facebook, from the details and description above. Copy the one you want; nothing is posted or saved.</p>
+          <div class="ai-row">
+            <button type="button" class="a-btn ai-btn" id="ai-social">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>
+              <span class="ai-label">Write captions</span>
+            </button>
+            <span class="a-hint" id="ai-social-status" aria-live="polite"></span>
+          </div>
+          <ol class="captions" id="ai-captions"></ol>
+        </section>
+      )}
+
+      <section class="admin-box" aria-labelledby="vid-h">
+        <h2 id="vid-h">Walkaround video <span class="a-opt">(optional)</span></h2>
+        <div>
+          <label class="a-lbl" for="f-video">Video link</label>
+          <input class="a-in" id="f-video" name="videoUrl" type="url" inputmode="url" value={car.video?.url} placeholder="https://youtu.be/…" aria-invalid={err("video") ? "true" : undefined} aria-describedby={err("video") ? "f-video-err f-video-hint" : "f-video-hint"} />
+          {err("video") && <p class="a-err" id="f-video-err">{err("video")}</p>}
+          <p class="a-hint" id="f-video-hint">A YouTube link (unlisted is fine), a Vimeo link, or the web address of an .mp4 file. Leave empty for no video.</p>
+        </div>
+        <div class="grid2">
+          <div>
+            <label class="a-lbl" for="f-vlen">Length <span class="a-opt">(optional)</span></label>
+            <input class="a-in" id="f-vlen" name="videoLength" value={car.video?.length} placeholder="2:14" aria-invalid={err("videoLength") ? "true" : undefined} aria-describedby={err("videoLength") ? "f-vlen-err" : undefined} />
+            {err("videoLength") && <p class="a-err" id="f-vlen-err">{err("videoLength")}</p>}
+          </div>
+          {car.photos.length > 0 && (
+            <div>
+              <label class="a-lbl" for="f-vposter">Poster photo</label>
+              <select class="a-in" id="f-vposter" name="videoPoster">
+                <option value="">Photo {car.photos.length > 1 ? 2 : 1} (the default)</option>
+                {car.photos.map((p, i) => (
+                  <option value={p.id} selected={car.video?.poster === p.id}>Photo {i + 1}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        <p class="a-hint">The page shows the poster photo with a play button; the video itself only loads when someone presses play.</p>
       </section>
     </div>
 
@@ -185,6 +256,8 @@ const pending = car.pending ?? [];
 </form>
 
 <script>
+  import { askAi, busy } from "../../scripts/admin-ai.ts";
+
   const form = document.querySelector<HTMLFormElement>(".car-form");
   if (form) {
     const list = form.querySelector<HTMLOListElement>(".photos")!;
@@ -293,7 +366,10 @@ const pending = car.pending ?? [];
         if (!editing) {
           // A new car: they go up with the form.
           const n = [...form.querySelectorAll<HTMLInputElement>('input[type="file"]')].reduce((s, i) => s + (i.files?.length ?? 0), 0);
-          chosen.textContent = `${n} ${n === 1 ? "photo" : "photos"} ready to upload with the car`;
+          chosen.textContent =
+            n > 20
+              ? `${n} photos chosen: only the first 20 go up with the car. Add the rest after saving.`
+              : `${n} ${n === 1 ? "photo" : "photos"} ready to upload with the car`;
           return;
         }
         // Editing: upload now, one at a time, then let the server work.
@@ -335,6 +411,96 @@ const pending = car.pending ?? [];
     const syncPoa = () => (price.disabled = poa.checked);
     poa.addEventListener("change", syncPoa);
     syncPoa();
+
+    // AI (shown only when it's set up). The form's values as it would send
+    // them, without the photo files.
+    const fields = () => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of new FormData(form)) if (typeof v === "string" && !(k in out)) out[k] = v;
+      return out;
+    };
+
+    // Description: write from the details, or polish the notes; Undo puts
+    // back what was there.
+    const descBtn = form.querySelector<HTMLButtonElement>("#ai-desc");
+    if (descBtn) {
+      const box = form.querySelector<HTMLTextAreaElement>("#f-desc")!;
+      const undo = form.querySelector<HTMLButtonElement>("#ai-desc-undo")!;
+      const status = form.querySelector<HTMLElement>("#ai-desc-status")!;
+      const label = descBtn.querySelector(".ai-label")!;
+      const relabel = () => (label.textContent = box.value.trim() ? "Polish with AI" : "Write with AI");
+      let before = "";
+      box.addEventListener("input", () => {
+        relabel();
+        undo.hidden = true;
+      });
+      descBtn.addEventListener("click", () =>
+        busy(descBtn, box.value.trim() ? "Polishing…" : "Writing…", status, async () => {
+          const background = form.querySelector<HTMLInputElement>("#ai-desc-bg")?.checked ?? false;
+          const { description } = await askAi<{ description: string }>({ task: "description", fields: fields(), background });
+          before = box.value;
+          box.value = description;
+          undo.hidden = false;
+          return "Done. Check it, then save.";
+        }).then(relabel),
+      );
+      undo.addEventListener("click", () => {
+        box.value = before;
+        undo.hidden = true;
+        status.textContent = "Put back as it was.";
+        relabel();
+      });
+    }
+
+    // Social captions: three to choose from, each with a Copy button.
+    const socialBtn = form.querySelector<HTMLButtonElement>("#ai-social");
+    if (socialBtn) {
+      const status = form.querySelector<HTMLElement>("#ai-social-status")!;
+      const list = form.querySelector<HTMLOListElement>("#ai-captions")!;
+      socialBtn.addEventListener("click", () =>
+        busy(socialBtn, "Writing…", status, async () => {
+          const { captions } = await askAi<{ captions: string[] }>({ task: "captions", fields: fields() });
+          list.replaceChildren(
+            ...captions.map((c) => {
+              const li = document.createElement("li");
+              const p = document.createElement("p");
+              p.textContent = c;
+              const copy = document.createElement("button");
+              copy.type = "button";
+              copy.className = "a-btn";
+              copy.textContent = "Copy";
+              copy.addEventListener("click", async () => {
+                try {
+                  await navigator.clipboard.writeText(c);
+                  copy.textContent = "Copied";
+                } catch {
+                  copy.textContent = "Select and copy it";
+                }
+              });
+              li.append(p, copy);
+              return li;
+            }),
+          );
+          return "";
+        }).then(() => {
+          if (list.children.length) socialBtn.querySelector(".ai-label")!.textContent = "Write new ones";
+        }),
+      );
+    }
+
+    // Photo descriptions: written in the background, saved as each is done.
+    const altBtn = form.querySelector<HTMLButtonElement>("#ai-alt");
+    if (altBtn) {
+      const status = form.querySelector<HTMLElement>("#ai-alt-status")!;
+      altBtn.addEventListener("click", () =>
+        busy(altBtn, "Starting…", status, async () => {
+          const { queued } = await askAi<{ queued: number }>({ task: "alt", carId });
+          return queued
+            ? `Describing ${queued} photo${queued > 1 ? "s" : ""} in the background. Each is saved as it's done; reload the page later to see them.`
+            : "Every photo is already described.";
+        }),
+      );
+    }
   }
 </script>
 
@@ -343,6 +509,44 @@ const pending = car.pending ?? [];
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+  .ai-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+  .ai-row .a-hint {
+    margin: 0;
+    flex: 1 1 240px;
+  }
+  .ai-btn[aria-busy="true"] {
+    cursor: progress;
+  }
+  .captions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .captions:empty {
+    display: none;
+  }
+  .captions li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--color-line);
+    background: var(--color-bg);
+  }
+  .captions p {
+    flex: 1;
+    margin: 0;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
   }
   .ph-head {
     display: flex;
