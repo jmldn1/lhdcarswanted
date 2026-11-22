@@ -75,10 +75,11 @@ const err = (k: keyof Enquiry) => errors[k];
 
   <div class="wrap gallery-wrap">
     {n > 0 && (
+     <div class="gal">
       <section class:list={["mosaic", { single: !mosaic }]} aria-label="Photos">
-        {shown.map((p, i) => (
+        {car.photos.map((p, i) => (
           <>
-          {i === 1 && video && (
+          {i === 1 && video && mosaic && (
             <button type="button" class="tile vtile" data-video aria-label={video.label}>
               {video.poster && <CarPhoto photo={video.poster} fit="cover" sizes="(min-width: 1240px) 300px, 25vw" />}
               <span class="vshade" aria-hidden="true">
@@ -89,7 +90,7 @@ const err = (k: keyof Enquiry) => errors[k];
           )}
           <button
             type="button"
-            class:list={["tile", { lead: i === 0 }]}
+            class:list={["tile", { lead: i === 0, extra: i >= shown.length }]}
             data-i={i}
             aria-label={mosaic && i === shown.length - 1 ? `View all ${n} photos` : `Open photo ${i + 1} of ${n} full screen`}
           >
@@ -98,7 +99,7 @@ const err = (k: keyof Enquiry) => errors[k];
               fit="cover"
               priority={i === 0}
               alt={i === 0 ? (p.alt ?? `${name}, photo 1 of ${n}`) : ""}
-              sizes={i === 0 ? "(min-width: 1240px) 600px, (min-width: 640px) 50vw, 100vw" : "(min-width: 1240px) 300px, 25vw"}
+              sizes={i === 0 ? "(min-width: 1240px) 600px, (min-width: 640px) 50vw, 100vw" : "(min-width: 1240px) 300px, (min-width: 640px) 25vw, 100vw"}
               style={i === 0 ? `view-transition-name: car-${car.id}` : undefined}
             />
             {mosaic && i === shown.length - 1 && (
@@ -116,13 +117,15 @@ const err = (k: keyof Enquiry) => errors[k];
           </button>
           </>
         ))}
-        {video && (
-          <button type="button" class="vpill" data-video aria-label={video.label}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg>
-            Video{video.length && ` ${video.length}`}
-          </button>
-        )}
       </section>
+      {video && (
+        <button type="button" class="vpill" data-video aria-label={video.label}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" /></svg>
+          Video{video.length && ` ${video.length}`}
+        </button>
+      )}
+      {n > 1 && <span class="pos" aria-hidden="true"><span data-pos>1</span> / {n}</span>}
+     </div>
     )}
     <script type="application/json" id="lightbox-photos" set:html={lightboxJson(car)} />
     {video && <script type="application/json" id="car-video" set:html={video.json} />}
@@ -270,10 +273,26 @@ const err = (k: keyof Enquiry) => errors[k];
 
   wireVideo();
 
-  // Each mosaic photo opens full screen at that photo; the last one ("View
-  // all") and, on phones, the single photo open at the start.
+  // Each photo opens full screen at that photo. On phones the photos are a
+  // swipeable row: the counter follows it, and closing the full screen leaves
+  // the row on the photo last viewed.
+  const strip = document.querySelector<HTMLElement>(".mosaic");
+  const pos = document.querySelector<HTMLElement>("[data-pos]");
+  const swiping = () => !!strip && strip.scrollWidth > strip.clientWidth + 1;
+  const at = () => (strip ? Math.round(strip.scrollLeft / strip.clientWidth) : 0);
+  strip?.addEventListener(
+    "scroll",
+    () => {
+      if (pos) pos.textContent = String(at() + 1);
+    },
+    { passive: true },
+  );
   document.querySelectorAll<HTMLButtonElement>(".mosaic .tile:not(.vtile)").forEach((t) => {
-    t.addEventListener("click", () => openLightbox(Number(t.dataset.i ?? 0)));
+    t.addEventListener("click", () =>
+      openLightbox(Number(t.dataset.i ?? 0), (index) => {
+        if (strip && swiping() && index !== at()) strip.scrollTo({ left: index * strip.clientWidth, behavior: "instant" });
+      }),
+    );
   });
 </script>
 
@@ -285,6 +304,13 @@ const err = (k: keyof Enquiry) => errors[k];
   }
   .gallery-wrap {
     margin-top: 12px;
+  }
+  .gal {
+    position: relative;
+  }
+  /* Photos past the mosaic's: only in the phones' swipeable row. */
+  .extra {
+    display: none;
   }
   /* Desktop: one large photo and four small; phones: the large one only. */
   .mosaic {
@@ -383,7 +409,7 @@ const err = (k: keyof Enquiry) => errors[k];
     height: 14px;
     fill: currentColor;
   }
-  .single .vpill {
+  .single + .vpill {
     display: inline-flex;
   }
   .watch .fill {
@@ -431,25 +457,68 @@ const err = (k: keyof Enquiry) => errors[k];
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  /* The photo number on phones, kept in step by the script. */
+  .pos {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: none;
+    height: 30px;
+    padding: 0 10px;
+    line-height: 30px;
+    white-space: pre;
+    background: color-mix(in srgb, var(--color-fg) 70%, transparent);
+    color: #fff;
+    font: 700 14px/1 var(--font-body);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  /* Phones: every photo, edge to edge, in a row to swipe through. */
   @media (max-width: 639px) {
     .gallery-wrap {
       padding-inline: 0;
     }
-    .mosaic {
-      display: block;
+    .mosaic,
+    .mosaic.single {
+      display: flex;
       aspect-ratio: 4 / 3;
+      max-height: none;
+      gap: 0;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
     }
-    .mosaic .tile:not(.lead) {
+    .mosaic::-webkit-scrollbar {
       display: none;
     }
-    .mosaic .lead {
-      width: 100%;
+    .mosaic .tile,
+    .mosaic .extra {
+      display: block;
+      flex: 0 0 100%;
       height: 100%;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
     }
-    .count {
-      display: inline-flex;
+    .mosaic .vtile,
+    .mosaic .all,
+    .mosaic .count.always {
+      display: none;
+    }
+    .tile:hover :global(img) {
+      transform: none;
     }
     .vpill {
+      display: inline-flex;
+    }
+    /* Without the script the counter can't follow, so it says how many. */
+    .pos {
+      display: none;
+    }
+    :global(html.js) .pos {
+      display: block;
+    }
+    :global(html:not(.js)) .mosaic .lead .count {
       display: inline-flex;
     }
   }

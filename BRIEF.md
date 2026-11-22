@@ -134,7 +134,5 @@ site. Started 18 November 2026.
    v1 does. Up to 20 photos (30 MB each) go up with a new car's Save
    (more are added after saving, one at a time); they're made web-ready in
    the background. nginx must allow that size of request and its timeouts,
-   or uploads fail: use the same `client_max_body_size` and `proxy_*_timeout`
-   values as v1's preview site. **Waiting on:** those values, from
-   `sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"` on the
-   VPS (README, "The admin").
+   or uploads fail. v1 uses 200m and 300s timeouts; this site allows 30 MB
+   a photo, so 650M with the same timeouts (README, "The admin").

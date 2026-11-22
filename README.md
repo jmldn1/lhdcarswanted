@@ -50,8 +50,10 @@ one request (`MAX_UPLOAD_COUNT`, `MAX_UPLOAD_BYTES` in
 anything over 1 MB by default, so the site's server block needs the same
 `client_max_body_size` and `proxy_*_timeout` values as London LHD Centre v1's
 preview site, which handles the same uploads (find them with
-`sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"`). Values:
-**[TO COPY FROM V1]**.
+`sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"`). v1 uses
+`client_max_body_size 200m` and `proxy_read_timeout`/`proxy_send_timeout
+300s` (its photos are up to 10 MB). This site allows 30 MB a photo, so it
+uses `client_max_body_size 650M` with the same 300s timeouts.
 
 Walkaround videos: a car can have a YouTube or Vimeo link, or the https
 address of an .mp4/.webm file (`src/lib/video.ts`). The car's page shows one
