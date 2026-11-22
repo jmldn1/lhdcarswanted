@@ -55,6 +55,8 @@ export interface SellCopy {
   steps: { title: string; text: string }[];
   /** Under the thank-you heading. */
   thanks: string;
+  /** Questions on the sell-your-<model> landing pages; "{model}" becomes the model's name. */
+  faqs?: { q: string; a: string }[];
 }
 
 export interface Brand {

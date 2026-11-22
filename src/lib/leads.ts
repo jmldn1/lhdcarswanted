@@ -24,7 +24,7 @@ export interface SellRequest {
   year: string;
   mileage: string;
   unit: "miles" | "km";
-  registered: "UK" | "Europe" | "Elsewhere";
+  registered: "UK" | "Europe" | "Elsewhere" | "Not registered";
   drive: "Left hand drive" | "Right hand drive";
   name: string;
   email: string;
@@ -32,6 +32,10 @@ export interface SellRequest {
   dial: string;
   phone: string;
   message: string;
+  /** The landing page it was sent from ("/sell-your-porsche-911"), if any. */
+  source?: string;
+  /** What the registration lookup found, in one line, if one was made. */
+  lookup?: string;
 }
 
 export type SellErrors = Partial<Record<keyof SellRequest | "photos", string>>;
@@ -50,7 +54,7 @@ export function readSellForm(form: FormData): { data: SellRequest; photos: File[
     year: text(form, "year", 4),
     mileage: text(form, "mileage", 12),
     unit: oneOf(text(form, "unit"), ["miles", "km"] as const, "miles"),
-    registered: oneOf(text(form, "registered"), ["UK", "Europe", "Elsewhere"] as const, "UK"),
+    registered: oneOf(text(form, "registered"), ["UK", "Europe", "Elsewhere", "Not registered"] as const, "UK"),
     drive: oneOf(text(form, "drive"), ["Left hand drive", "Right hand drive"] as const, "Left hand drive"),
     name: text(form, "name", 100),
     email: text(form, "email", 200),

@@ -8,7 +8,7 @@ import { listLeads } from "../lib/leads.ts";
 
 interface Props {
   title: string;
-  active?: "cars" | "blog" | "photos" | "leads";
+  active?: "cars" | "blog" | "landing" | "photos" | "leads";
 }
 const { title, active } = Astro.props;
 
@@ -47,6 +47,10 @@ const newLeads = (await Promise.all([listLeads("sell"), listLeads("enquiries"), 
             <span>Blog</span>
           </a>
         )}
+        <a class="item" href="/admin/landing" aria-current={active === "landing" ? "page" : undefined}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M8 13h8M8 16h5" /></svg>
+          <span>Landing</span>
+        </a>
         <a class="item" href="/admin/photos" aria-current={active === "photos" ? "page" : undefined}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" /><path d="m4 16 5-5 4 4 3-3 4 4" /><circle cx="15.5" cy="9" r="1.5" /></svg>
           <span>Photos</span>

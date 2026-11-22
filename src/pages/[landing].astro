@@ -1,0 +1,1248 @@
+---
+// A model's landing page, "Sell your Porsche 911" at /sell-your-porsche-911.
+// Pages are added in Admin, Landing (src/lib/landings.ts); any other address
+// here is a 404.
+//
+// The hero, from landing mockup D2 ("registration first", as on AutoGalleria):
+// one number-plate box; the DVLA and MOT records find the car
+// (/api/lookup); then "where should we reply?". A registration the DVLA
+// doesn't know asks whether the car is registered outside the UK, and that
+// route asks where, the plate as typed, and year and mileage (optional). Each
+// step replaces the last inside a hero of fixed height, so the page never
+// jumps. Without JavaScript, without the lookup's keys, or when the server
+// finds a mistake in what was sent, the hero shows the full form instead
+// (mockup A). Either way the form posts here and is saved as a sell request
+// (LEADS_DIR/sell, with the page and the lookup's findings), then redirects
+// to a thank-you so a refresh can't send it twice.
+import Base from "../layouts/Base.astro";
+import CarPhoto from "../components/CarPhoto.astro";
+import CarCard from "../components/CarCard.astro";
+import { brand } from "../brands/index.ts";
+import { listCars, makeSlug } from "../lib/cars.ts";
+import { getLanding, factorList, landingName } from "../lib/landings.ts";
+import { lookupReady } from "../lib/vehicle-lookup.ts";
+import { readSellForm, saveSellRequest, DIAL_CODES, type SellRequest, type SellErrors } from "../lib/leads.ts";
+
+const landing = await getLanding(Astro.params.landing ?? "");
+if (!landing) return new Response(null, { status: 404 });
+
+const name = landingName(landing);
+const here = `/${landing.slug}`;
+const sell = brand.copy.sell;
+
+let values: Partial<SellRequest> = { make: landing.make, model: landing.model, unit: "miles", registered: "UK", dial: "+44" };
+let errors: SellErrors = {};
+let failed = false;
+
+if (Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  // Left empty by people; filled by bots. Bots get the thank-you anyway.
+  if (String(form.get("website") ?? "")) return Astro.redirect(`${here}?sent=1#value`, 303);
+  const read = readSellForm(form);
+  values = read.data;
+  errors = read.errors;
+  if (!Object.keys(errors).length) {
+    try {
+      const lookup = String(form.get("lookup") ?? "").trim().slice(0, 300) || undefined;
+      await saveSellRequest({ ...read.data, source: here, lookup }, []);
+      return Astro.redirect(`${here}?sent=1#value`, 303);
+    } catch {
+      failed = true;
+    }
+  }
+  Astro.response.status = 400;
+}
+const sent = Astro.url.searchParams.get("sent") === "1";
+const err = (k: keyof SellRequest) => errors[k];
+// The registration flow, unless it's off or the full form has something to show.
+const flow = lookupReady() && !sent && !failed && !Object.keys(errors).length;
+
+// That make's cars in stock: the hero's photo if none was uploaded, and two cards.
+const stock = (await listCars()).filter((c) => makeSlug(c.make) === makeSlug(landing.make) && c.status !== "sold");
+const sameModel = stock.find((c) => c.photos.length && c.model.toLowerCase().includes(landing.model.toLowerCase()));
+const hero = landing.photo ?? (sameModel ?? stock.find((c) => c.photos.length))?.photos[0];
+const cards = stock.slice(0, 2);
+
+const factors = factorList(landing.factors);
+const paras = (t: string) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const faqs = (sell?.faqs ?? []).map((f) => ({ q: f.q.replaceAll("{model}", landing.model), a: f.a }));
+const sales = brand.contact.phones[0];
+const TICKS = ["Free valuation", "Top cash prices paid", "Outstanding finance settled", "Free UK collection"];
+const PLACES: [string, string][] = [["Europe", "Europe"], ["Elsewhere", "Outside Europe"], ["Not registered", "Not registered"], ["UK", "UK"]];
+const tick = "m5 12 5 5 9-10";
+---
+
+<Base title={`Sell your ${name}`} description={landing.summary || `Sell your left hand drive ${name}. ${sell?.bandText ?? ""}`.trim()} flush>
+  <section id="value" class:list={["hero", { "has-flow": flow }]}>
+    {hero && <CarPhoto class="hero-img" photo={hero} fit="cover" sizes="100vw" priority alt={landing.photoAlt ?? ""} />}
+    <div class="hero-shade"></div>
+
+    {sent && (
+      <div class="wrap hero-flow">
+        <div class="col" role="status">
+          <span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={tick} /></svg>Sent</span>
+          <h1>Thank you</h1>
+          <p class="sub">We've got the details of your car. {sell?.thanks}</p>
+          <p class="note">Want to add photos? <a href="/sell-your-car">Send them with the full form</a>.</p>
+        </div>
+      </div>
+    )}
+
+    {flow && (
+      <form class="wrap hero-flow flow" method="post" action={`${here}#value`} novalidate data-make={landing.make} data-model={landing.model}>
+        <input type="hidden" name="make" value={landing.make} />
+        <input type="hidden" name="model" value={landing.model} />
+        <input type="hidden" name="reg" />
+        <input type="hidden" name="year" />
+        <input type="hidden" name="mileage" />
+        <input type="hidden" name="unit" value="miles" />
+        <input type="hidden" name="registered" value="UK" />
+        <input type="hidden" name="drive" value="Left hand drive" />
+        <input type="hidden" name="lookup" />
+        <div class="hp" aria-hidden="true"><label for="f-website">Leave this empty</label><input id="f-website" name="website" tabindex="-1" autocomplete="off" /></div>
+
+        <div class="col" data-step="reg">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="/sell-your-car">Sell your car</a><span aria-hidden="true">/</span>{landing.make}<span aria-hidden="true">/</span>{landing.model}</nav>
+          <h1 tabindex="-1">Sell your {name}</h1>
+          <p class="sub">Free valuation. Start with your registration and we'll find your car.</p>
+          <div class="plate-row">
+            <label class="plate">
+              <span class="band" aria-hidden="true">UK</span>
+              <span class="sr">Registration</span>
+              <input id="f-plate" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="AB12 CDE" maxlength="10" />
+            </label>
+            <button class="btn btn-primary find" type="button" data-act="find">Find my car</button>
+          </div>
+          <p class="msg" role="alert" hidden></p>
+          <button class="link" type="button" data-act="abroad">Registered outside the UK, or not registered?</button>
+          <ul class="ticks">
+            {TICKS.slice(1).map((t) => <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d={tick} /></svg>{t}</li>)}
+          </ul>
+        </div>
+
+        <div class="col" data-step="found" hidden>
+          <span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={tick} /></svg>We found your car</span>
+          <h2 tabindex="-1" data-out="title"></h2>
+          <dl class="facts" data-out="facts"></dl>
+          <p class="note">From the DVLA and MOT records</p>
+          <div class="acts">
+            <button class="btn btn-primary" type="button" data-act="mine">Yes, that's my car</button>
+            <button class="link" type="button" data-act="back">Not your car? Check the registration</button>
+          </div>
+        </div>
+
+        <div class="col" data-step="notfound" hidden>
+          <h2 tabindex="-1">We couldn't find <span data-out="reg"></span></h2>
+          <p class="sub">It isn't on the UK register. Is the car registered outside the UK?</p>
+          <div class="acts">
+            <button class="btn btn-primary" type="button" data-act="abroad">Yes, it's registered outside the UK</button>
+            <button class="btn btn-ghost" type="button" data-act="back">Let me check the registration</button>
+          </div>
+        </div>
+
+        <div class="col" data-step="abroad" hidden>
+          <h2 tabindex="-1">Your {name}</h2>
+          <p class="msg" data-out="abroad-msg" hidden></p>
+          <fieldset>
+            <legend class="lbl">Where is it registered?</legend>
+            <div class="pills">
+              {PLACES.map(([v, label]) => (
+                <label class="pill" data-place={v} hidden={v === "UK"}><input class="sr" type="radio" name="place" value={v} checked={v === "Europe"} /><span>{label}</span></label>
+              ))}
+            </div>
+          </fieldset>
+          <div class="grid3">
+            <div data-plate-field>
+              <label class="lbl" for="f-reg2">Registration</label>
+              <input class="in" id="f-reg2" autocomplete="off" autocapitalize="characters" placeholder="As on the plate" maxlength="20" />
+            </div>
+            <div>
+              <label class="lbl" for="f-year">Year <span class="opt">(optional)</span></label>
+              <input class="in" id="f-year" inputmode="numeric" maxlength="4" />
+            </div>
+            <div>
+              <label class="lbl" for="f-miles">Mileage <span class="opt">(optional)</span></label>
+              <div class="unit-in">
+                <input class="in" id="f-miles" inputmode="numeric" maxlength="9" />
+                <select class="in unit" id="f-unit" aria-label="Miles or kilometres"><option value="miles">mi</option><option value="km">km</option></select>
+              </div>
+            </div>
+          </div>
+          <div class="acts">
+            <button class="btn btn-primary" type="button" data-act="continue">Continue</button>
+            <button class="link" type="button" data-act="back">It's UK registered after all</button>
+          </div>
+        </div>
+
+        <div class="col" data-step="contact" hidden>
+          <h2 tabindex="-1">Where should we send your valuation?</h2>
+          <div class="carpill">
+            <div><strong data-out="pill-title"></strong><span data-out="pill-sub"></span></div>
+            <button class="link" type="button" data-act="change">Change</button>
+          </div>
+          <div class="grid2">
+            <div>
+              <label class="lbl" for="f-name">Your name</label>
+              <input class="in" id="f-name" name="name" autocomplete="name" />
+            </div>
+            <div>
+              <label class="lbl" for="f-email">Email</label>
+              <input class="in" id="f-email" name="email" type="email" autocomplete="email" />
+            </div>
+            <div class="span2">
+              <label class="lbl" for="f-phone">Phone <span class="opt">(optional)</span></label>
+              <div class="tel">
+                <select name="dial" class="dial" aria-label="Country code">
+                  {DIAL_CODES.map(([code]) => <option value={code} selected={code === "+44"}>{code}</option>)}
+                </select>
+                <input class="in" id="f-phone" name="phone" type="tel" autocomplete="tel-national" />
+              </div>
+            </div>
+          </div>
+          <p class="msg" role="alert" data-out="contact-msg" hidden></p>
+          <button class="btn btn-primary" type="submit">Get my free valuation</button>
+          {sell?.trust && <p class="note">{sell.trust}</p>}
+        </div>
+      </form>
+    )}
+
+    {!sent && (
+      <div class:list={["wrap", "hero-in", { "nojs-only": flow }]}>
+        <div class="hero-copy">
+          <nav class="crumbs" aria-label="Breadcrumb"><a href="/sell-your-car">Sell your car</a><span aria-hidden="true">/</span>{landing.make}<span aria-hidden="true">/</span>{landing.model}</nav>
+          <span class="eyebrow">Free valuation</span>
+          {flow ? <p class="h1">Sell your {name}</p> : <h1>Sell your {name}</h1>}
+          <p class="lead">{landing.summary || sell?.bandText}</p>
+          <ul class="ticks">
+            {TICKS.map((t) => <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d={tick} /></svg>{t}</li>)}
+          </ul>
+        </div>
+
+        <div class="form-card">
+          <form method="post" action={`${here}#value`} novalidate>
+            <h2>Get a free valuation</h2>
+            {failed && <p class="fail" role="alert">Sorry, that didn't send. Please try again{sales?.tel ? ", or call us" : ""}.</p>}
+            <div class="grid2">
+              <div class="field">
+                <label for="l-make">Make</label>
+                <input id="l-make" name="make" class="in" value={values.make} aria-invalid={err("make") ? "true" : undefined} />
+                {err("make") && <p class="err">{err("make")}</p>}
+              </div>
+              <div class="field">
+                <label for="l-model">Model</label>
+                <input id="l-model" name="model" class="in" value={values.model} aria-invalid={err("model") ? "true" : undefined} />
+                {err("model") && <p class="err">{err("model")}</p>}
+              </div>
+              <div class="field">
+                <label for="l-year">Year</label>
+                <input id="l-year" name="year" class="in" inputmode="numeric" maxlength="4" value={values.year} aria-invalid={err("year") ? "true" : undefined} aria-describedby={err("year") ? "l-year-err" : undefined} />
+                {err("year") && <p class="err" id="l-year-err">{err("year")}</p>}
+              </div>
+              <div class="field">
+                <label for="l-miles">Mileage</label>
+                <input id="l-miles" name="mileage" class="in" inputmode="numeric" value={values.mileage} aria-invalid={err("mileage") ? "true" : undefined} aria-describedby={err("mileage") ? "l-miles-err" : undefined} />
+                {err("mileage") && <p class="err" id="l-miles-err">{err("mileage")}</p>}
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="l-reg">Registration <span class="opt">(optional)</span></label>
+                <input id="l-reg" name="reg" class="in" value={values.reg} autocapitalize="characters" />
+              </div>
+              <div class="field">
+                <label for="l-where">Registered in</label>
+                <select id="l-where" name="registered" class="in">
+                  {(["UK", "Europe", "Elsewhere", "Not registered"] as const).map((r) => <option selected={values.registered === r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="l-name">Your name</label>
+              <input id="l-name" name="name" class="in" autocomplete="name" value={values.name} aria-invalid={err("name") ? "true" : undefined} aria-describedby={err("name") ? "l-name-err" : undefined} />
+              {err("name") && <p class="err" id="l-name-err">{err("name")}</p>}
+            </div>
+            <div class="field">
+              <label for="l-email">Email</label>
+              <input id="l-email" name="email" type="email" class="in" autocomplete="email" value={values.email} aria-invalid={err("email") ? "true" : undefined} aria-describedby={err("email") ? "l-email-err" : undefined} />
+              {err("email") && <p class="err" id="l-email-err">{err("email")}</p>}
+            </div>
+            <div class="field">
+              <label for="l-phone">Phone <span class="opt">(optional)</span></label>
+              <div class="tel">
+                <select name="dial" class="dial" aria-label="Country code">
+                  {DIAL_CODES.map(([code]) => <option value={code} selected={values.dial === code}>{code}</option>)}
+                </select>
+                <input id="l-phone" name="phone" type="tel" class="in" autocomplete="tel-national" value={values.phone} aria-invalid={err("phone") ? "true" : undefined} aria-describedby={err("phone") ? "l-phone-err" : undefined} />
+              </div>
+              {err("phone") && <p class="err" id="l-phone-err">{err("phone")}</p>}
+            </div>
+            <input type="hidden" name="unit" value={values.unit ?? "miles"} />
+            <input type="hidden" name="drive" value="Left hand drive" />
+            <div class="hp" aria-hidden="true">
+              <label for="l-website">Leave this empty</label>
+              <input id="l-website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <button class="btn btn-primary big" type="submit">Get my free valuation</button>
+            {sell?.trust && <p class="small">{sell.trust}</p>}
+          </form>
+        </div>
+      </div>
+    )}
+  </section>
+
+  <main class="body">
+    {sell?.steps?.length && (
+      <section class="wrap" aria-labelledby="how-h">
+        <h2 id="how-h">How it works</h2>
+        <ol class="steps">
+          {sell.steps.map((s, i) => (
+            <li><span class="n">{i + 1}</span><h3>{s.title}</h3><p>{s.text}</p></li>
+          ))}
+        </ol>
+      </section>
+    )}
+
+    {(landing.overview || factors.length || landing.tips) && (
+      <section class="wrap value" aria-labelledby="value-h">
+        <div class="value-text">
+          <h2 id="value-h">What affects the value of a left hand drive {landing.model}</h2>
+          {paras(landing.overview).map((p) => <p>{p}</p>)}
+          {factors.length > 0 && (
+            <ul class="factors">
+              {factors.map((f) => (
+                <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d={tick} /></svg><span><strong>{f.title}</strong>{f.text && ` ${f.text}`}</span></li>
+              ))}
+            </ul>
+          )}
+          {landing.tips && (
+            <>
+              <h3>Getting the best price for your {landing.model}</h3>
+              {paras(landing.tips).map((p) => <p>{p}</p>)}
+            </>
+          )}
+        </div>
+      </section>
+    )}
+
+    {cards.length > 0 && (
+      <section class="wrap" aria-labelledby="stock-h">
+        <div class="sec-head">
+          <h2 id="stock-h">{landing.make} cars in stock</h2>
+          <a href={`/cars?make=${makeSlug(landing.make)}`}>See them all</a>
+        </div>
+        <div class="cards">
+          {cards.map((c) => <CarCard car={c} fit={brand.cardPhoto.fit} />)}
+        </div>
+      </section>
+    )}
+
+    {faqs.length > 0 && (
+      <section class="wrap faq" aria-labelledby="faq-h">
+        <h2 id="faq-h">Selling your {landing.model}: questions</h2>
+        {faqs.map((f) => (
+          <details>
+            <summary>{f.q}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
+      </section>
+    )}
+  </main>
+
+  <section class="band">
+    <div class="wrap band-in">
+      <div>
+        <h2>{sell?.bandHeading ?? "Got a car to sell?"}</h2>
+        {sell?.bandText && <p>{sell.bandText}</p>}
+      </div>
+      <a class="btn btn-light big" href="#value">Value my {landing.model}</a>
+    </div>
+  </section>
+
+  <div class="call-bar">
+    {sales?.tel && <a class="btn big" href={`tel:${sales.tel}`}>Call</a>}
+    <a class="btn btn-dark big" href="#value">Value my {landing.model}</a>
+  </div>
+</Base>
+
+<script>
+  // The registration flow (the hero's steps). The form it fills is a normal
+  // POST; this only moves between steps and fills the hidden fields.
+  const flow = document.querySelector<HTMLFormElement>(".flow");
+  if (flow) {
+    type Vehicle = { reg: string; year?: string; make?: string; model?: string; colour?: string; fuel?: string; engine?: number; motStatus?: string; lastMileage?: string };
+    const $ = <T extends Element = HTMLElement>(sel: string) => flow.querySelector<T>(sel)!;
+    const out = (key: string) => $(`[data-out="${key}"]`);
+    const hidden = (name: string) => $<HTMLInputElement>(`input[type="hidden"][name="${name}"]`);
+    const steps = [...flow.querySelectorAll<HTMLElement>("[data-step]")];
+    const plate = $<HTMLInputElement>("#f-plate");
+    const findBtn = $<HTMLButtonElement>('[data-act="find"]');
+    const regMsg = $<HTMLElement>('[data-step="reg"] .msg');
+    let step = "reg";
+    let vehicle: Vehicle | null = null;
+    let route: "uk" | "abroad" = "uk";
+
+    const show = (name: string, focus = true) => {
+      step = name;
+      steps.forEach((s) => (s.hidden = s.dataset.step !== name));
+      if (focus) $<HTMLElement>(`[data-step="${name}"] [tabindex="-1"]`)?.focus({ preventScroll: true });
+    };
+    const say = (el: HTMLElement, text: string) => {
+      el.textContent = text;
+      el.hidden = !text;
+    };
+    const tidy = (reg: string) => reg.toUpperCase().replace(/\s+/g, " ").trim();
+
+    // 1. The registration: the DVLA and MOT records, or the non-UK route.
+    const find = async () => {
+      const reg = tidy(plate.value);
+      if (!reg) return say(regMsg, "Enter your registration, or choose the link below.");
+      say(regMsg, "");
+      findBtn.disabled = true;
+      findBtn.textContent = "Finding your car…";
+      try {
+        const res = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reg }) });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.found) {
+          vehicle = data.vehicle as Vehicle;
+          hidden("lookup").value = data.summary ?? "";
+          const v = vehicle;
+          out("title").textContent = [v.year, v.make, v.model].filter(Boolean).join(" ");
+          const facts: [string, string | undefined][] = [
+            ["Registration", reg],
+            ["Colour", v.colour],
+            ["Fuel", v.fuel],
+            ["Engine", v.engine ? `${v.engine.toLocaleString("en-GB")} cc` : undefined],
+            ["Last MOT mileage", v.lastMileage],
+            ["MOT", v.motStatus],
+          ];
+          out("facts").replaceChildren(
+            ...facts.filter(([, val]) => val).map(([k, val]) => {
+              const d = document.createElement("div");
+              const dt = document.createElement("dt");
+              const dd = document.createElement("dd");
+              dt.textContent = k;
+              dd.textContent = val!;
+              d.append(dt, dd);
+              return d;
+            }),
+          );
+          show("found");
+        } else if (res.ok) {
+          out("reg").textContent = reg;
+          show("notfound");
+        } else if (res.status === 400) {
+          say(regMsg, data.error ?? "That doesn't look like a registration.");
+        } else {
+          // The lookup is down or busy: carry on without it, as a UK car.
+          toAbroad(true, data.error ?? "We couldn't check that registration just now.");
+        }
+      } catch {
+        toAbroad(true, "We couldn't check that registration just now.");
+      } finally {
+        findBtn.disabled = false;
+        findBtn.textContent = "Find my car";
+      }
+    };
+
+    // 2b. Outside the UK (or the lookup failed: then "UK" is offered and chosen).
+    const regField = $<HTMLElement>("[data-plate-field]");
+    const reg2 = $<HTMLInputElement>("#f-reg2");
+    const ukPill = $<HTMLElement>('[data-place="UK"]');
+    const place = () => flow.querySelector<HTMLInputElement>('input[name="place"]:checked')?.value ?? "Europe";
+    const syncPlace = () => (regField.hidden = place() === "Not registered");
+    flow.querySelectorAll<HTMLInputElement>('input[name="place"]').forEach((r) => r.addEventListener("change", syncPlace));
+    const toAbroad = (lookupFailed = false, why = "") => {
+      vehicle = null;
+      hidden("lookup").value = "";
+      ukPill.hidden = !lookupFailed;
+      const pick = flow.querySelector<HTMLInputElement>(`input[name="place"][value="${lookupFailed ? "UK" : "Europe"}"]`);
+      if (pick && (lookupFailed || place() === "UK")) pick.checked = true;
+      say(out("abroad-msg"), why ? `${why} Tell us about the car instead.` : "");
+      if (!reg2.value) reg2.value = tidy(plate.value);
+      syncPlace();
+      show("abroad");
+    };
+
+    // 3. Where to reply, with the car in a pill.
+    const toContact = () => {
+      const make = flow.dataset.make!;
+      const model = flow.dataset.model!;
+      if (route === "uk" && vehicle) {
+        const v = vehicle;
+        hidden("make").value = v.make ?? make;
+        hidden("model").value = v.model ?? model;
+        hidden("year").value = v.year ?? "";
+        hidden("mileage").value = "";
+        hidden("registered").value = "UK";
+        hidden("reg").value = tidy(plate.value);
+        out("pill-title").textContent = [v.year, v.make, v.model].filter(Boolean).join(" ") || `${make} ${model}`;
+        out("pill-sub").textContent = [tidy(plate.value), v.colour, v.fuel].filter(Boolean).join(" · ");
+      } else {
+        const where = place();
+        const reg = where === "Not registered" ? "" : tidy(reg2.value);
+        const year = $<HTMLInputElement>("#f-year").value.trim();
+        const miles = $<HTMLInputElement>("#f-miles").value.trim();
+        const unit = $<HTMLSelectElement>("#f-unit").value;
+        hidden("make").value = make;
+        hidden("model").value = model;
+        hidden("year").value = year;
+        hidden("mileage").value = miles;
+        hidden("unit").value = unit;
+        hidden("registered").value = where;
+        hidden("reg").value = reg;
+        const label = { UK: "Registered in the UK", Europe: "Registered in Europe", Elsewhere: "Registered outside Europe", "Not registered": "Not registered" }[where] ?? where;
+        out("pill-title").textContent = [year, make, model].filter(Boolean).join(" ");
+        out("pill-sub").textContent = [reg, label, miles && `${miles} ${unit}`].filter(Boolean).join(" · ");
+      }
+      show("contact");
+    };
+
+    flow.addEventListener("click", (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLElement>("[data-act]")?.dataset.act;
+      if (!act) return;
+      if (act === "find") find();
+      else if (act === "abroad") {
+        route = "abroad";
+        toAbroad();
+      } else if (act === "back") {
+        show("reg");
+        plate.focus();
+      } else if (act === "mine") {
+        route = "uk";
+        toContact();
+      } else if (act === "continue") {
+        const year = $<HTMLInputElement>("#f-year").value.trim();
+        if (year && !/^(19|20)\d\d$/.test(year)) return say(out("abroad-msg"), "Enter the year like 1997, or leave it empty.");
+        route = "abroad";
+        toContact();
+      } else if (act === "change") show(route === "uk" ? "reg" : "abroad");
+    });
+
+    // Enter moves on; only the last step sends the form.
+    flow.addEventListener("submit", (e) => {
+      if (step === "reg") {
+        e.preventDefault();
+        find();
+        return;
+      }
+      if (step === "abroad") {
+        e.preventDefault();
+        $<HTMLButtonElement>('[data-act="continue"]').click();
+        return;
+      }
+      if (step !== "contact") return e.preventDefault();
+      const nameOk = $<HTMLInputElement>("#f-name").value.trim();
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($<HTMLInputElement>("#f-email").value.trim());
+      if (!nameOk || !emailOk) {
+        e.preventDefault();
+        say(out("contact-msg"), !nameOk ? "Enter your name." : "Enter an email address like you@example.com.");
+        $<HTMLInputElement>(!nameOk ? "#f-name" : "#f-email").focus();
+      }
+    });
+    plate.addEventListener("input", () => say(regMsg, ""));
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    isolation: isolate;
+    background: var(--color-band);
+    color: var(--color-band-fg);
+    overflow: hidden;
+    scroll-margin-top: 0;
+  }
+  .hero :global(.hero-img) {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    --focus: 60% 55%;
+  }
+  .hero-shade {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: color-mix(in srgb, var(--color-band) 66%, transparent);
+  }
+  /* The registration flow: one fixed height for every step, so the page
+     below never moves. Dark on the left (the words), the car clear on the right. */
+  :global(html.js) .has-flow {
+    height: clamp(620px, 80vh, 760px);
+  }
+  :global(html.js) .has-flow .hero-shade {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-band) 94%, transparent) 0%, color-mix(in srgb, var(--color-band) 86%, transparent) 45%, color-mix(in srgb, var(--color-band) 25%, transparent) 75%, color-mix(in srgb, var(--color-band) 10%, transparent) 100%);
+  }
+  :global(html:not(.js)) .flow,
+  :global(html.js) .nojs-only {
+    display: none;
+  }
+  .hero-flow {
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+  .hero > .hero-flow:not(.flow) {
+    min-height: 520px;
+  }
+  .col {
+    width: min(620px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .col[hidden] {
+    display: none;
+  }
+  .col h1,
+  .col h2 {
+    font: 700 clamp(44px, 6vw, 78px)/1.02 var(--font-display);
+    margin: 0;
+    overflow-wrap: anywhere;
+    outline: none;
+  }
+  .col h2 {
+    font-size: clamp(38px, 5vw, 60px);
+  }
+  .sub {
+    margin: 0;
+    font-size: 19px;
+  }
+  .note {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-band-muted);
+  }
+  .note a {
+    color: inherit;
+  }
+  .plate-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 100%;
+  }
+  .plate {
+    flex: 1 1 280px;
+    display: flex;
+    height: 66px;
+    border: 2px solid #111;
+    background: #f7d117;
+    overflow: hidden;
+  }
+  .plate .band {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    background: #1d4ed8;
+    color: #fff;
+    font: 700 13px/1 var(--font-body);
+  }
+  .plate input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    padding: 0 16px;
+    font: 700 36px/1 var(--font-display);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #111;
+  }
+  .plate input::placeholder {
+    color: rgb(17 17 17 / 0.35);
+  }
+  .plate:focus-within {
+    outline: 3px solid var(--color-band-fg);
+    outline-offset: 2px;
+  }
+  .find {
+    min-height: 66px;
+    padding-inline: 26px;
+    font-weight: 700;
+  }
+  .link {
+    border: 0;
+    background: none;
+    padding: 6px 0;
+    font: 600 16px/1.3 var(--font-body);
+    color: var(--color-band-fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .msg {
+    margin: 0;
+    font-weight: 600;
+    color: #ffc4bd;
+  }
+  .msg[hidden] {
+    display: none;
+  }
+  .ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: #9fe0b5;
+  }
+  .ok svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 24px;
+    width: 100%;
+    margin: 0;
+    padding: 16px 0;
+    border-block: 1px solid color-mix(in srgb, var(--color-band-fg) 25%, transparent);
+  }
+  .facts :global(dt) {
+    font: 700 11px/1.3 var(--font-body);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-band-muted);
+  }
+  .facts :global(dd) {
+    margin: 2px 0 0;
+    font-weight: 600;
+  }
+  .acts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--color-band-fg);
+    color: var(--color-band-fg);
+  }
+  .col .btn {
+    min-height: 52px;
+    font-weight: 700;
+  }
+  fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .lbl {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .opt {
+    font-weight: 400;
+    color: var(--color-band-muted);
+  }
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    position: relative;
+    cursor: pointer;
+  }
+  .pill[hidden] {
+    display: none;
+  }
+  .pill span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1.5px solid color-mix(in srgb, var(--color-band-fg) 60%, transparent);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .pill input:checked + span {
+    background: var(--color-band-fg);
+    border-color: var(--color-band-fg);
+    color: var(--color-band);
+  }
+  .pill input:focus-visible + span {
+    outline: 3px solid var(--color-band-fg);
+    outline-offset: 2px;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .col .in {
+    border: 0;
+    min-height: 48px;
+  }
+  .grid3,
+  .grid2 {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+  }
+  .grid3 [hidden] {
+    display: none;
+  }
+  @media (min-width: 640px) {
+    .grid3 {
+      grid-template-columns: 1.3fr 0.8fr 1fr;
+    }
+    .col .grid2 {
+      grid-template-columns: 1fr 1fr;
+    }
+    .span2 {
+      grid-column: span 2;
+    }
+  }
+  .unit-in {
+    display: flex;
+  }
+  .unit-in .in:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+  .unit-in .unit {
+    flex: none;
+    width: 68px;
+    padding: 0 6px;
+    border-left: 1px solid var(--color-line);
+  }
+  .carpill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border-left: 4px solid #9cc6ec;
+    background: color-mix(in srgb, var(--color-band-fg) 10%, transparent);
+  }
+  .carpill strong,
+  .carpill span {
+    display: block;
+  }
+  .carpill span {
+    font-size: 14px;
+    color: var(--color-band-muted);
+  }
+  .carpill .link {
+    flex: none;
+    font-size: 15px;
+  }
+  .col .tel {
+    border: 0;
+  }
+  .col .dial {
+    background: #fff;
+    border-right: 1px solid var(--color-line);
+  }
+  @media (max-width: 639px) {
+    :global(html.js) .has-flow {
+      height: max(640px, calc(100svh - 56px));
+    }
+    :global(html.js) .has-flow .hero-shade {
+      background: color-mix(in srgb, var(--color-band) 78%, transparent);
+    }
+    .facts {
+      grid-template-columns: 1fr 1fr;
+    }
+    .find {
+      flex: 1 1 100%;
+      min-height: 52px;
+    }
+    .col {
+      gap: 12px;
+    }
+  }
+
+  /* The full form: without JavaScript, without the lookup, or with a mistake to show. */
+  .hero-in {
+    display: grid;
+    gap: 32px 48px;
+    align-items: center;
+    padding-block: 48px;
+  }
+  @media (min-width: 960px) {
+    .hero-in {
+      grid-template-columns: minmax(0, 1fr) 440px;
+      padding-block: 56px;
+    }
+  }
+  .hero-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--color-band-muted);
+  }
+  .crumbs a {
+    color: var(--color-band-muted);
+  }
+  .eyebrow {
+    font: 700 12px/1 var(--font-body);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-band-muted);
+  }
+  .hero-copy h1,
+  .hero-copy .h1 {
+    font: 700 clamp(44px, 6vw, 72px)/1.02 var(--font-display);
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .lead {
+    margin: 0;
+    font-size: 20px;
+    max-width: 34em;
+  }
+  .ticks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+    max-width: 560px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .col .ticks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin: 0;
+    max-width: none;
+    font-size: 15px;
+  }
+  .ticks li,
+  .factors li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .col .ticks li {
+    gap: 6px;
+    align-items: center;
+  }
+  .ticks svg,
+  .factors svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 3px;
+    fill: none;
+    stroke: var(--color-band-muted);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .col .ticks svg {
+    margin-top: 0;
+    width: 18px;
+    height: 18px;
+    stroke: #9cc6ec;
+  }
+  .factors svg {
+    stroke: var(--color-accent);
+  }
+  .form-card {
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border: 1px solid var(--color-line);
+    padding: 26px;
+  }
+  @media (max-width: 639px) {
+    .form-card {
+      padding: 20px 16px;
+    }
+  }
+  .form-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .form-card h2 {
+    font: 700 32px/1.05 var(--font-display);
+    margin: 0;
+  }
+  .form-card .grid2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .field label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .form-card .opt {
+    color: var(--color-muted);
+  }
+  .in {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 46px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+    background: var(--color-surface);
+    color: var(--color-fg);
+    font: inherit;
+  }
+  .col .in {
+    background: #fff;
+    color: #16181d;
+  }
+  .in[aria-invalid="true"] {
+    border-color: #b42318;
+  }
+  .tel {
+    display: flex;
+    border: 1px solid color-mix(in srgb, var(--color-fg) 48%, var(--color-surface));
+  }
+  .tel .in {
+    border: 0;
+  }
+  .dial {
+    flex: none;
+    width: 82px;
+    border: 0;
+    border-right: 1px solid var(--color-line);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font: inherit;
+    padding: 0 8px;
+  }
+  .col .dial {
+    color: #16181d;
+  }
+  .err,
+  .fail {
+    margin: 4px 0 0;
+    color: #b42318;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .small {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+  }
+  .big {
+    min-height: 50px;
+    font-weight: 700;
+  }
+  .btn-dark {
+    background: var(--color-fg);
+    border-color: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .btn-light {
+    background: var(--color-band-fg);
+    border-color: var(--color-band-fg);
+    color: var(--color-band);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 64px;
+    padding-block: 64px;
+  }
+  /* In a flex column, .wrap's auto margins would shrink it to its content. */
+  .body > .wrap {
+    width: 100%;
+  }
+  .body h2 {
+    font: 700 clamp(30px, 3.6vw, 40px)/1.08 var(--font-display);
+    margin: 0 0 20px;
+  }
+  .steps {
+    display: grid;
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 760px) {
+    .steps {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+  }
+  .steps li {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    padding: 22px;
+  }
+  .n {
+    font: 700 42px/1 var(--font-display);
+    color: var(--color-accent);
+  }
+  .steps h3 {
+    font: 700 24px/1.1 var(--font-display);
+    margin: 10px 0 6px;
+  }
+  .steps p {
+    margin: 0;
+    color: var(--color-muted);
+  }
+  .value-text {
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    font-size: 18px;
+  }
+  .value-text h2 {
+    margin: 0;
+  }
+  .value-text p {
+    margin: 0;
+  }
+  .value-text h3 {
+    font: 700 26px/1.1 var(--font-display);
+    margin: 12px 0 0;
+  }
+  .factors {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .sec-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px 16px;
+    margin-bottom: 20px;
+  }
+  .sec-head h2 {
+    margin: 0;
+  }
+  .sec-head a {
+    font-weight: 700;
+  }
+  .cards {
+    display: grid;
+    gap: 20px;
+  }
+  @media (min-width: 600px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 900px) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  /* Left-aligned with the other sections; lines kept to a readable length. */
+  .faq > * {
+    max-width: 852px;
+  }
+  .faq details {
+    border-bottom: 1px solid var(--color-line);
+  }
+  .faq details:first-of-type {
+    border-top: 1px solid var(--color-line);
+  }
+  .faq summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    min-height: 44px;
+    padding: 16px 0;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary svg {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    transition: transform 0.2s ease;
+  }
+  .faq details[open] summary svg {
+    transform: rotate(45deg);
+  }
+  .faq details p {
+    margin: 0 0 18px;
+    color: var(--color-muted);
+  }
+
+  .band {
+    background: var(--color-band);
+    color: var(--color-band-fg);
+  }
+  .band-in {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px 32px;
+    padding-block: 44px;
+  }
+  .band h2 {
+    font: 700 clamp(28px, 3.4vw, 36px)/1.1 var(--font-display);
+    margin: 0;
+  }
+  .band p {
+    margin: 6px 0 0;
+    color: var(--color-band-muted);
+  }
+  /* Phones: Call and Value stay at the bottom of the screen until the footer. */
+  .call-bar {
+    display: none;
+  }
+  @media (max-width: 639px) {
+    .call-bar {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      gap: 8px;
+      padding: 10px max(16px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-bottom, 0px));
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-line);
+    }
+    .ticks {
+      gap: 8px 12px;
+      font-size: 15px;
+    }
+  }
+</style>

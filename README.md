@@ -124,3 +124,5 @@ its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 | `ANTHROPIC_API_KEY` | (none) | The admin's AI writing help (`src/lib/ai.ts`); without it the AI buttons don't show |
 | `AI_MODEL` | `claude-opus-5-5` | The Claude model the AI help uses |
 | `AI_DAILY_LIMIT` | `300` | AI requests a day (a cap on spending; counts again after a restart) |
+| `DVLA_API_KEY` | (none) | The landing pages' registration lookup (`src/lib/vehicle-lookup.ts`); without it they show the full form |
+| `MOT_API_KEY`, `DVSA_TENANT_ID`, `DVSA_CLIENT_ID`, `DVSA_CLIENT_SECRET` | (none) | The MOT history API, for the model and the last MOT mileage; the lookup works without it, minus those |

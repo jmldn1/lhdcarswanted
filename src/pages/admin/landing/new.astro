@@ -1,0 +1,54 @@
+---
+// Admin: add a landing page. Saved as a draft unless Published is chosen.
+import Admin from "../../../layouts/Admin.astro";
+import LandingForm from "../../../components/admin/LandingForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { newLandingId, readLandingForm, saveLanding, type Landing, type LandingErrors } from "../../../lib/landings.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/landing", 303);
+
+let landing: Landing = { id: newLandingId(), slug: "", make: "", model: "", status: "draft", summary: "", overview: "", factors: "", tips: "" };
+let errors: LandingErrors = {};
+
+if (Astro.request.method === "POST") {
+  if (Number(Astro.request.headers.get("content-length") ?? 0) > 40 * 1024 * 1024) {
+    errors = { photo: "That photo is too big (30 MB at most)." };
+  } else {
+    const form = await Astro.request.formData();
+    // The photo is only made web-ready once the rest is valid.
+    const read = await readLandingForm(form, landing);
+    landing = read.landing;
+    errors = read.errors;
+    if (!Object.keys(errors).length) {
+      await saveLanding(landing);
+      return Astro.redirect(`/admin/landing/${landing.id}?saved=1`, 303);
+    }
+    // Not saved: the address is made again from the corrected make and model.
+    landing = { ...landing, slug: "" };
+  }
+  Astro.response.status = 400;
+}
+---
+
+<Admin title="Add a landing page" active="landing">
+  <div class="page">
+    <div>
+      <a class="up" href="/admin/landing">Landing pages</a>
+      <h1 class="admin-h1">Add a landing page</h1>
+    </div>
+    <LandingForm landing={landing} errors={errors} mode="new" />
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+</style>

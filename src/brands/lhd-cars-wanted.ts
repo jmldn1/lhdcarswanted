@@ -63,6 +63,14 @@ export const lhdCarsWanted: Brand = {
         { title: "Paid and collected", text: "Secure payment and free collection anywhere in the UK." },
       ],
       thanks: "[We'll reply within REPLY TIME] by email, or by phone if you gave us a number.",
+      // Answers in brackets wait for the client.
+      faqs: [
+        { q: "There's finance outstanding on my {model}. Can I still sell it?", a: "Yes. We settle outstanding finance as part of buying your car." },
+        { q: "Do I have to bring the car to you?", a: "No. Collection is free, anywhere in the UK." },
+        { q: "Do you buy cars that aren't registered in the UK?", a: "[CLIENT TO CONFIRM: whether you buy cars still on foreign plates, and how.]" },
+        { q: "How and when do I get paid?", a: "[CLIENT TO CONFIRM: how payment works and how quickly.] Payment is secure." },
+        { q: "Do you buy cars that don't run?", a: "[CLIENT TO CONFIRM]" },
+      ],
     },
     about: {
       heading: "Left hand drive cars, bought and sold",

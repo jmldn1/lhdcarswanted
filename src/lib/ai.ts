@@ -93,7 +93,8 @@ async function ask<T>(o: {
   }
 }
 
-const obj = (props: Record<string, unknown>) => ({ type: "object", properties: props, required: Object.keys(props) });
+// Structured replies need every object, nested ones too, closed to extra keys.
+const obj = (props: Record<string, unknown>) => ({ type: "object", properties: props, required: Object.keys(props), additionalProperties: false });
 const str = { type: "string" };
 
 /** The car's details as given in the form, one per line; only those filled in. */
@@ -176,6 +177,40 @@ One phrase, at most 120 characters, no full stop. Start with the car (year, make
     effort: "low",
   });
   return r.alt.trim().replace(/\.$/, "").slice(0, 160);
+}
+
+export interface LandingDraft {
+  summary: string;
+  overview: string;
+  factors: { title: string; text: string }[];
+  tips: string;
+}
+
+/**
+ * The words for a "Sell your <make> <model>" landing page: general, well-known
+ * knowledge about the model (to be checked), nothing about the business beyond
+ * the confirmed selling points, which the page already shows.
+ */
+export async function landingAssist(make: string, model: string, notes: string): Promise<LandingDraft> {
+  return ask<LandingDraft>({
+    task: `Task: write the words for the website's "Sell your ${make} ${model}" page, for people in the UK thinking of selling a left hand drive ${make} ${model}.
+The page already shows the dealer's confirmed selling points (free valuation, top cash prices paid, outstanding finance settled, secure payment, free UK collection), how it works, a valuation form and questions, so don't repeat those.
+About the model: general, well-known facts only (its generations, variants or specifications that buyers look for, what affects value), and only what you're confident is accurate for this exact model. No prices, values, production numbers or dates you aren't sure of. Nothing about any particular car.
+About ${brand.name}: nothing beyond the notes; where a sentence needs a fact about the business, use a placeholder in square brackets.
+Write:
+- summary: one or two sentences (under 160 characters) shown under the heading and in Google results.
+- overview: two short paragraphs, separated by a blank line: what buyers look for in a left hand drive ${make} ${model}.
+- factors: 4 to 6 things that affect its value, each a short title and one sentence.
+- tips: one or two short paragraphs on getting the best price when selling one (paperwork, keys, history, photos to send).
+Plain text, no markdown.`,
+    schema: obj({
+      summary: str,
+      overview: str,
+      factors: { type: "array", items: obj({ title: str, text: str }) },
+      tips: str,
+    }),
+    content: `Make: ${make}\nModel: ${model}\n\nDealer's notes:\n${notes.trim().slice(0, 4000) || "(none)"}`,
+  });
 }
 
 export type BlogMode = "draft" | "polish" | "shorten" | "headline";

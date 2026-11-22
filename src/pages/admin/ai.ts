@@ -6,10 +6,11 @@
 //   { task: "captions", fields }           → { captions }
 //   { task: "alt", carId }                 → { queued }  (in the background)
 //   { task: "blog", mode, title, intro, body } → { title?, intro?, body?, titles? }
+//   { task: "landing", make, model, notes }    → { summary, overview, factors, tips }
 //
 // `fields` are the car form's values, read as the form itself reads them.
 import type { APIRoute } from "astro";
-import { AiError, blogAssist, polishDescription, socialCaptions, type BlogMode } from "../../lib/ai.ts";
+import { AiError, blogAssist, landingAssist, polishDescription, socialCaptions, type BlogMode } from "../../lib/ai.ts";
 import { readCarForm } from "../../lib/car-form.ts";
 import { describeLater } from "../../lib/photo-alt.ts";
 import type { Car } from "../../lib/cars.ts";
@@ -55,6 +56,12 @@ export const POST: APIRoute = async ({ request }) => {
         const id = text(body.carId);
         if (!/^[a-z0-9]+$/i.test(id)) return json({ error: "No such car" }, 400);
         return json({ queued: await describeLater(id) });
+      }
+      case "landing": {
+        const make = text(body.make).trim().slice(0, 60);
+        const model = text(body.model).trim().slice(0, 80);
+        if (!make || !model) return json({ error: "Enter the make and model first." }, 400);
+        return json(await landingAssist(make, model, text(body.notes)));
       }
       case "blog": {
         const mode = text(body.mode) as BlogMode;

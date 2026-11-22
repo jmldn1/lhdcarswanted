@@ -1,0 +1,120 @@
+---
+// Admin: edit a landing page. Delete needs a tick to confirm and removes its photo.
+import Admin from "../../../layouts/Admin.astro";
+import LandingForm from "../../../components/admin/LandingForm.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { adminLanding, deleteLanding, landingName, readLandingForm, saveLanding, type Landing, type LandingErrors } from "../../../lib/landings.ts";
+
+if (!hasDb()) return Astro.redirect("/admin/landing", 303);
+const found = await adminLanding(Astro.params.id ?? "");
+if (!found) return new Response("No such page", { status: 404 });
+let landing: Landing = found;
+let errors: LandingErrors = {};
+let deleteError = "";
+
+if (Astro.request.method === "POST") {
+  if (Number(Astro.request.headers.get("content-length") ?? 0) > 40 * 1024 * 1024) {
+    errors = { photo: "That photo is too big (30 MB at most)." };
+  } else {
+    const form = await Astro.request.formData();
+    if (form.get("intent") === "delete") {
+      if (form.get("confirm") === "on") {
+        await deleteLanding(landing.id);
+        return Astro.redirect("/admin/landing?deleted=1", 303);
+      }
+      deleteError = "Tick the box to confirm.";
+    } else {
+      const read = await readLandingForm(form, landing);
+      landing = read.landing;
+      errors = read.errors;
+      if (!Object.keys(errors).length) {
+        await saveLanding(landing);
+        return Astro.redirect(`/admin/landing/${landing.id}?saved=1`, 303);
+      }
+    }
+  }
+  Astro.response.status = 400;
+}
+const saved = Astro.url.searchParams.get("saved") === "1";
+---
+
+<Admin title={`Sell your ${landingName(found)}`} active="landing">
+  <div class="page">
+    <div class="head">
+      <div>
+        <a class="up" href="/admin/landing">Landing pages</a>
+        <h1 class="admin-h1">Sell your {landingName(found)}</h1>
+      </div>
+      {found.status === "published" && <a class="a-btn" href={`/${found.slug}`} target="_blank" rel="noopener">View on the site</a>}
+    </div>
+    {saved && <p class="a-note" role="status">Saved.</p>}
+
+    <LandingForm landing={landing} errors={errors} mode="edit" />
+
+    <details class="danger" open={Boolean(deleteError)}>
+      <summary>Delete this page</summary>
+      <form method="post">
+        <input type="hidden" name="intent" value="delete" />
+        <p>This removes the page from the site, with its photo. Links to it will stop working. It can't be undone.</p>
+        <label class="check"><input type="checkbox" name="confirm" /> Yes, delete this page</label>
+        {deleteError && <p class="a-err" role="alert">{deleteError}</p>}
+        <button class="a-btn del" type="submit">Delete the page</button>
+      </form>
+    </details>
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+  }
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .up {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .danger summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: #b42318;
+    padding: 8px 0;
+  }
+  .danger form {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 18px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .danger p {
+    margin: 0;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .del {
+    border-color: #b42318;
+    background: #b42318;
+    color: #fff;
+  }
+</style>

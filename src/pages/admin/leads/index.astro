@@ -50,6 +50,8 @@ const facts: [string, string][] = open
         ["Mileage", r.mileage ? `${s(r.mileage)} ${s(r.unit)}` : "Not given"],
         ["Registered", s(r.registered)],
         ["Steering", s(r.drive)],
+        ...(r.lookup ? [["DVLA and MOT", s(r.lookup)] as [string, string]] : []),
+        ...(r.source ? [["Sent from", s(r.source)] as [string, string]] : []),
         ["Name", s(r.name)],
         ["Phone", phone || "Not given"],
         ["Email", email],

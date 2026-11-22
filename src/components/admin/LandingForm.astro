@@ -1,0 +1,264 @@
+---
+// The admin's add/edit landing page form: the make and model (which make the
+// address), the words (AI Assist drafts them from the make and model, to be
+// checked), Draft/Published and the hero photo.
+import type { Landing, LandingErrors } from "../../lib/landings.ts";
+import { landingSlug } from "../../lib/landings.ts";
+import { pick } from "../../lib/photos.ts";
+import { aiReady } from "../../lib/ai.ts";
+
+interface Props {
+  landing: Landing;
+  errors: LandingErrors;
+  mode: "new" | "edit";
+}
+const { landing, errors, mode } = Astro.props;
+const err = (k: keyof LandingErrors) => errors[k];
+const ai = aiReady();
+const address = landing.slug || (landing.make && landing.model ? landingSlug(landing.make, landing.model) : "sell-your-make-model");
+const SPARK = "M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z";
+---
+
+<form method="post" enctype="multipart/form-data" class="landing-form" novalidate>
+  <input type="hidden" name="intent" value="save" />
+  <div class="cols">
+    <div class="col-main">
+      <section class="admin-box" aria-labelledby="car-h">
+        <h2 id="car-h">The car</h2>
+        <div class="grid2">
+          <div>
+            <label class="a-lbl" for="g-make">Make</label>
+            <input class="a-in" id="g-make" name="make" value={landing.make} placeholder="Porsche" aria-invalid={err("make") ? "true" : undefined} aria-describedby={err("make") ? "g-make-err" : undefined} />
+            {err("make") && <p class="a-err" id="g-make-err">{err("make")}</p>}
+          </div>
+          <div>
+            <label class="a-lbl" for="g-model">Model</label>
+            <input class="a-in" id="g-model" name="model" value={landing.model} placeholder="911" aria-invalid={err("model") ? "true" : undefined} aria-describedby={err("model") ? "g-model-err" : undefined} />
+            {err("model") && <p class="a-err" id="g-model-err">{err("model")}</p>}
+          </div>
+        </div>
+        <div>
+          <span class="a-lbl">Web address</span>
+          <p class="addr">/{address}</p>
+          <p class="a-hint">{mode === "new" ? "Made from the make and model when you save." : "Kept if you rename it, so links don't break."}</p>
+        </div>
+      </section>
+
+      <section class="admin-box" aria-labelledby="words-h">
+        <h2 id="words-h">The words</h2>
+        {ai && (
+          <div class="ai-box">
+            <label class="a-lbl" for="g-notes">Notes for the AI <span class="a-opt">(optional: anything you know about buying these)</span></label>
+            <textarea class="a-in" id="g-notes" rows="2" placeholder="e.g. we see a lot of 997s; manuals are most wanted"></textarea>
+            <div class="ai-row">
+              <button type="button" class="a-btn pri" id="ai-landing">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d={SPARK} /></svg>
+                <span class="ai-label">Write with AI</span>
+              </button>
+              <button type="button" class="a-btn" id="ai-landing-undo" hidden>Undo</button>
+              <p class="a-hint" id="ai-landing-status" aria-live="polite">Fills the four boxes below from the make and model. Check every fact about the model before publishing.</p>
+            </div>
+          </div>
+        )}
+        <div>
+          <label class="a-lbl" for="g-summary">Summary <span class="a-opt">(one or two sentences: under the heading, and in Google)</span></label>
+          <textarea class="a-in" id="g-summary" name="summary" rows="2">{landing.summary}</textarea>
+        </div>
+        <div>
+          <label class="a-lbl" for="g-overview">What buyers look for</label>
+          <textarea class="a-in" id="g-overview" name="overview" rows="6">{landing.overview}</textarea>
+        </div>
+        <div>
+          <label class="a-lbl" for="g-factors">What affects the value <span class="a-opt">(one per line: "Title: one sentence")</span></label>
+          <textarea class="a-in" id="g-factors" name="factors" rows="6" placeholder="Mileage and history: …">{landing.factors}</textarea>
+        </div>
+        <div>
+          <label class="a-lbl" for="g-tips">Getting the best price</label>
+          <textarea class="a-in" id="g-tips" name="tips" rows="5">{landing.tips}</textarea>
+        </div>
+        <p class="a-hint">The page also shows how it works, the valuation form, your cars of that make and the questions, which are the same on every landing page.</p>
+      </section>
+    </div>
+
+    <div class="col-side">
+      <section class="admin-box" aria-labelledby="pub-h">
+        <h2 id="pub-h">Publishing</h2>
+        <fieldset>
+          <legend class="sr">Status</legend>
+          <div class="a-pills">
+            <label class="a-pill"><input type="radio" name="status" value="draft" checked={landing.status === "draft"} /><span>Draft</span></label>
+            <label class="a-pill"><input type="radio" name="status" value="published" checked={landing.status === "published"} /><span>Published</span></label>
+          </div>
+          <p class="a-hint">Drafts are only seen here.</p>
+        </fieldset>
+      </section>
+
+      <section class="admin-box" aria-labelledby="ph-h">
+        <h2 id="ph-h">Photo at the top</h2>
+        {landing.photo ? (
+          <>
+            <img class="cover" src={pick(landing.photo.avif, 800).url} alt="" />
+            <label class="check"><input type="checkbox" name="removePhoto" /> Remove this photo</label>
+          </>
+        ) : (
+          <p class="a-hint">None yet: the page shows one of your {landing.make || "cars of that make"} from stock, if there is one.</p>
+        )}
+        <div>
+          <label class="a-lbl" for="g-photo">{landing.photo ? "Replace it" : "Upload a photo"} <span class="a-opt">(landscape, 2000 pixels wide or more)</span></label>
+          <input id="g-photo" name="photo" type="file" accept="image/*" aria-invalid={err("photo") ? "true" : undefined} />
+          {err("photo") && <p class="a-err">{err("photo")}</p>}
+        </div>
+        <div>
+          <label class="a-lbl" for="g-alt">What it shows <span class="a-opt">(for screen readers and Google)</span></label>
+          <input class="a-in" id="g-alt" name="photoAlt" value={landing.photoAlt} />
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <button class="a-btn pri" type="submit">{mode === "new" ? "Save the page" : "Save changes"}</button>
+  </div>
+</form>
+
+<script>
+  import { askAi, busy } from "../../scripts/admin-ai.ts";
+
+  // Write with AI: fills the four boxes; Undo puts back what was there.
+  const btn = document.querySelector<HTMLButtonElement>("#ai-landing");
+  if (btn) {
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+    const boxes = ["g-summary", "g-overview", "g-factors", "g-tips"].map((id) => $<HTMLTextAreaElement>(id));
+    const undo = $<HTMLButtonElement>("ai-landing-undo");
+    const status = $<HTMLElement>("ai-landing-status");
+    let before: string[] = [];
+    btn.addEventListener("click", () =>
+      busy(btn, "Writing…", status, async () => {
+        const r = await askAi<{ summary: string; overview: string; factors: { title: string; text: string }[]; tips: string }>({
+          task: "landing",
+          make: $<HTMLInputElement>("g-make").value,
+          model: $<HTMLInputElement>("g-model").value,
+          notes: $<HTMLTextAreaElement>("g-notes").value,
+        });
+        before = boxes.map((b) => b.value);
+        const [summary, overview, factors, tips] = boxes;
+        summary.value = r.summary;
+        overview.value = r.overview;
+        factors.value = r.factors.map((f) => `${f.title}: ${f.text}`).join("\n");
+        tips.value = r.tips;
+        undo.hidden = false;
+        return "Done. Check every fact about the model, then save.";
+      }),
+    );
+    undo.addEventListener("click", () => {
+      boxes.forEach((b, i) => (b.value = before[i] ?? b.value));
+      undo.hidden = true;
+      status.textContent = "Put back as it was.";
+    });
+  }
+</script>
+
+<style>
+  .landing-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .cols {
+    display: grid;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (min-width: 1000px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr) 340px;
+    }
+  }
+  .col-main,
+  .col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .grid2 {
+    display: grid;
+    gap: 14px;
+  }
+  @media (min-width: 640px) {
+    .grid2 {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .addr {
+    margin: 0;
+    font-family: ui-monospace, monospace;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+  .ai-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line);
+  }
+  .ai-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+  .ai-row .a-hint {
+    margin: 0;
+    flex: 1 1 240px;
+  }
+  fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .cover {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+  }
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 0;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-line);
+  }
+  @media (max-width: 799px) {
+    .save-bar {
+      bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    }
+    .save-bar .a-btn {
+      width: 100%;
+      min-height: 50px;
+    }
+  }
+</style>

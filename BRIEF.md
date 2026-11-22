@@ -116,6 +116,20 @@ site. Started 18 November 2026.
    which is for development; a business website needs a lightGallery
    commercial licence (its key then goes in the `licenseKey` setting), or
    the full screen switches to a free one such as PhotoSwipe.
+9. Landing pages, *built 21 Nov 2026* from mockup A
+   (https://claude.ai/artifact/DCFKBA3nNR4dsbjZ9G5HAD): "Sell your Porsche
+   911" at /sell-your-porsche-911, one per make and model, added in Admin,
+   Landing (AI Assist drafts the words, to be checked). The form saves a sell
+   request noting the page. The hero is mockup D2 *(built 21 Nov 2026)*:
+   registration first, as on AutoGalleria (DVLA and MOT lookup, then where
+   to reply; a plate the DVLA doesn't know offers the non-UK route), all
+   inside a hero of fixed height; the full form shows without JavaScript or
+   the lookup's keys. The keys in `.env` are AutoGalleria's for now: replace
+   them with this site's own before launch (nginx must pass `X-Real-IP` for
+   the lookup's per-visitor limit). **Waiting on the client:** the questions' answers
+   (foreign plates, payment, non-runners) in the brand file, and which makes
+   and models to add. Not built: make pages (mockup C), links to the landing
+   pages from /sell-your-car, a sitemap.
 8. Photo uploads on the VPS, *decided 21 Nov 2026:* do as London LHD Centre
    v1 does. Up to 20 photos (30 MB each) go up with a new car's Save
    (more are added after saving, one at a time); they're made web-ready in
