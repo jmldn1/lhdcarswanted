@@ -28,13 +28,13 @@ export const lhdCarsWanted: Brand = {
     body: '"Source Sans 3", "Segoe UI", system-ui, sans-serif',
   },
   contact: {
-    // Confirmed by the client, 22 Nov 2026.
+    // Phone confirmed by the client 22 Nov 2026; the same number is on WhatsApp (23 Nov).
     phones: [{ label: "Sales", display: "07447 430488", tel: "+447447430488" }],
     // Shown on the live site; to confirm.
     email: "info@lhdcarswanted.co.uk",
     address: "[ADDRESS]",
     hours: "[OPENING HOURS]",
-    whatsapp: "",
+    whatsapp: "447447430488",
   },
   features: {
     sellForm: true,
