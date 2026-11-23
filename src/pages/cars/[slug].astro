@@ -28,9 +28,13 @@ const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== 
 const whatsapp = brand.contact.whatsapp;
 
 const first = car.photos[0];
-// The strip takes the shape of the first photo (most of a car's photos share
-// it); any photo of another shape is shown whole inside that frame.
+// Phones and upright tablets: the strip takes the shape of the first photo
+// (most of a car's photos share it); any photo of another shape is shown whole
+// inside that frame. From 960px it's 16:9 for every car, as on v1, so the photo
+// and its thumbnails fit a laptop screen: photos fill it, trimmed equally top
+// and bottom, except upright or square ones, which would lose too much.
 const ratio = first ? `${first.width} / ${first.height}` : "3 / 2";
+const isTall = (p: { width: number; height: number }) => p.width / p.height < 1.2;
 const sales = brand.contact.phones[0];
 
 const name = `${car.make} ${car.model}`;
@@ -47,10 +51,10 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
 
     <div class="layout">
       <section class="gallery" aria-label="Photos">
-        <div class="frame" style={`aspect-ratio:${ratio}`}>
+        <div class="frame" style={`--first-photo:${ratio}`}>
           <div class="strip" tabindex="0">
             {car.photos.map((p, i) => (
-              <figure class="slide" id={`photo-${i + 1}`}>
+              <figure class:list={["slide", { tall: isTall(p) }]} id={`photo-${i + 1}`}>
                 <CarPhoto
                   photo={p}
                   fit="contain"
@@ -296,7 +300,17 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
   }
   .frame {
     position: relative;
+    aspect-ratio: var(--first-photo);
     background: var(--color-line);
+  }
+  @media (min-width: 960px) {
+    .frame {
+      aspect-ratio: 16 / 9;
+    }
+    .frame .slide:not(.tall) :global(img) {
+      object-fit: cover;
+      background-size: cover;
+    }
   }
   .strip {
     display: flex;
