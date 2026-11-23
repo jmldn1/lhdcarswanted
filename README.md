@@ -8,7 +8,7 @@ v2 code (`C:\Users\lhdca\Projects\londonlhd-v2`); see `BRIEF.md`.
 
 ```sh
 npm install
-npm run dev            # http://localhost:4321/
+npm run dev            # http://localhost:4391/ (this site's port, as on the VPS)
 BRAND=demo npm run dev # the made-up brand, to check nothing is hard-coded
 npm run check          # type check
 npm run build && npm start
@@ -47,13 +47,12 @@ location /photos/ {
 Upload size: a new car's Save sends up to 20 photos of up to 30 MB each in
 one request (`MAX_UPLOAD_COUNT`, `MAX_UPLOAD_BYTES` in
 `src/lib/photo-queue.ts`); an edit sends one photo per request. nginx refuses
-anything over 1 MB by default, so the site's server block needs the same
-`client_max_body_size` and `proxy_*_timeout` values as London LHD Centre v1's
-preview site, which handles the same uploads (find them with
-`sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"`). v1 uses
-`client_max_body_size 200m` and `proxy_read_timeout`/`proxy_send_timeout
-300s` (its photos are up to 10 MB). This site allows 30 MB a photo, so it
-uses `client_max_body_size 650M` with the same 300s timeouts.
+anything over 1 MB by default, so the site's server block needs its own
+values: `client_max_body_size 650M` (20 photos of 30 MB, with room to spare)
+and `proxy_read_timeout`/`proxy_send_timeout 300s`. Other sites on the VPS
+have 200m and 300s; which of them are London LHD Centre v1's isn't checked.
+To list them all:
+`sudo nginx -T | grep -n "client_max_body_size\|proxy_.*timeout"`.
 
 Walkaround videos: a car can have a YouTube or Vimeo link, or the https
 address of an .mp4/.webm file (`src/lib/video.ts`). The car's page shows one

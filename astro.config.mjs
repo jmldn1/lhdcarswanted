@@ -9,6 +9,9 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
+  // This site's own port, as on the VPS (PORT=4391), so it never clashes with
+  // London LHD Centre v2 on Astro's default 4321.
+  server: { port: 4391 },
   // Fetch likely next pages (car links in view) before they're clicked.
   prefetch: { prefetchAll: false, defaultStrategy: "viewport" },
   vite: { plugins: [tailwindcss()] },

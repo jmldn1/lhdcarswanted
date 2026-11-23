@@ -55,7 +55,8 @@ site. Started 18 November 2026.
    phones too, a featured car bar, then makes, cars, the sell band, services
    and the showroom. **Still open:** LHD Cars Wanted's own colours and logo
    (the mockups use London LHD Centre's steel blue and wordmark).
-2. **Facts:** the real phone and WhatsApp numbers, address, opening hours,
+2. **Facts:** phone *confirmed 22 Nov 2026:* 07447 430488. Still open: the
+   WhatsApp number, address, opening hours,
    and which claims (finance, warranty, reservations, part exchange,
    inspections) are true.
 3. **Pages for the first release:** /cars and car pages exist. Which of
@@ -134,5 +135,5 @@ site. Started 18 November 2026.
    v1 does. Up to 20 photos (30 MB each) go up with a new car's Save
    (more are added after saving, one at a time); they're made web-ready in
    the background. nginx must allow that size of request and its timeouts,
-   or uploads fail. v1 uses 200m and 300s timeouts; this site allows 30 MB
-   a photo, so 650M with the same timeouts (README, "The admin").
+   or uploads fail. This site allows 30 MB a photo, so 650M and 300s
+   timeouts (README, "The admin"). v1's own nginx values aren't checked.
