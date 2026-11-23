@@ -56,7 +56,7 @@ site. Started 18 November 2026.
    and the showroom. **Still open:** LHD Cars Wanted's own colours and logo
    (the mockups use London LHD Centre's steel blue and wordmark).
 2. **Facts:** phone *confirmed 22 Nov 2026:* 07447 430488, also the WhatsApp
-   number (*23 Nov*). Still open: address, opening hours,
+   number (*23 Nov*; its buttons are off for now). Still open: address, opening hours,
    and which claims (finance, warranty, reservations, part exchange,
    inspections) are true.
 3. **Pages for the first release:** /cars and car pages exist. Which of
