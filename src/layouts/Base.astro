@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import { brand, brandCss } from "../brands/index.ts";
+import WhatsAppFloat from "../components/WhatsAppFloat.astro";
 
 // Every brand's @font-face rules are bundled; a browser only downloads the
 // files of fonts the page actually uses, so other brands' fonts cost nothing.
@@ -22,8 +23,10 @@ interface Props {
   noindex?: boolean;
   /** The page ends in a full-width band: no gap above the footer. */
   flush?: boolean;
+  /** The car the page is about, for the WhatsApp button's message. */
+  car?: string;
 }
-const { title, description, noindex = false, flush = false } = Astro.props;
+const { title, description, noindex = false, flush = false, car } = Astro.props;
 const path = Astro.url.pathname;
 const sales = brand.contact.phones[0];
 ---
@@ -69,7 +72,7 @@ const sales = brand.contact.phones[0];
     <slot />
 
     <footer class:list={["site-foot", { flush }]}>
-      <div class="wrap cols">
+      <div class:list={["wrap cols", { beside: brand.contact.whatsapp }]}>
         <div>
           <div class="eyebrow">{brand.name}</div>
           <p>{brand.contact.address}</p>
@@ -83,6 +86,8 @@ const sales = brand.contact.phones[0];
         </ul>
       </div>
     </footer>
+
+    <WhatsAppFloat car={car} />
   </body>
 </html>
 
@@ -208,6 +213,13 @@ const sales = brand.contact.phones[0];
     gap: 16px 48px;
     justify-content: space-between;
     padding-block: 32px calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+  /* The WhatsApp button (56px, 16px from the edge) is beside the text, never
+     over it. Wider screens have room in the margin. */
+  @media (max-width: 1351px) {
+    .cols.beside {
+      padding-right: calc(88px + env(safe-area-inset-right, 0px));
+    }
   }
   .cols p,
   .cols ul {

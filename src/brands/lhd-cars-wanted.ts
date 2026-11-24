@@ -34,9 +34,7 @@ export const lhdCarsWanted: Brand = {
     email: "info@lhdcarswanted.co.uk",
     address: "[ADDRESS]",
     hours: "[OPENING HOURS]",
-    // Off for now (23 Nov): the layout is preferred without the WhatsApp buttons.
-    // To bring them back: "447447430488".
-    whatsapp: "",
+    whatsapp: "447447430488",
   },
   features: {
     sellForm: true,

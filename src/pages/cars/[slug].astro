@@ -25,7 +25,6 @@ const video = pageVideo(car);
 const facts = carFacts(car);
 // Two other cars for sale, then a tile linking to them all.
 const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== "sold").slice(0, 2);
-const whatsapp = brand.contact.whatsapp;
 
 const first = car.photos[0];
 // Phones and upright tablets: the strip takes the shape of the first photo
@@ -39,10 +38,9 @@ const sales = brand.contact.phones[0];
 
 const name = `${car.make} ${car.model}`;
 const enquire = `mailto:${brand.contact.email}?subject=${encodeURIComponent(`${name} (${Astro.url.pathname})`)}`;
-const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComponent(`${name}: ${Astro.url.href}`)}`;
 ---
 
-<Base title={`${car.make} ${car.model}`} description={specsLine(car)}>
+<Base title={name} description={specsLine(car)} car={name}>
  <div class="car-page">
   <main class="wrap page">
     <nav class="crumbs" aria-label="Breadcrumb">
@@ -121,18 +119,10 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
             Call {sales.display}
           </a>
         )}
-        <div class={whatsappHref ? "pair" : undefined}>
-          {whatsappHref && (
-            <a class="btn big" href={whatsappHref}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z" /></svg>
-              WhatsApp
-            </a>
-          )}
-          <a class="btn btn-dark big" href={enquire}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></svg>
-            Enquire
-          </a>
-        </div>
+        <a class="btn btn-dark big" href={enquire}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z" /><path d="m4 7 8 6 8-6" /></svg>
+          Enquire
+        </a>
         {video && (
           <button class="btn big watch" type="button" data-video>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M7 4.5v15l13-7.5z" /></svg>
@@ -563,14 +553,8 @@ const whatsappHref = whatsapp && `https://wa.me/${whatsapp}?text=${encodeURIComp
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .card .big,
-  .card .pair {
+  .card .big {
     width: 100%;
-  }
-  .pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
   }
   .btn-dark {
     background: var(--color-fg);
