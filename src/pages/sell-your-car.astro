@@ -25,6 +25,7 @@ import Thanks from "../components/sell/Thanks.astro";
 import { brand } from "../brands/index.ts";
 import { lookupReady } from "../lib/vehicle-lookup.ts";
 import { MAX_PHOTOS, MAX_PHOTO_BYTES } from "../lib/leads.ts";
+import { rememberName, rememberedName } from "../lib/first-name.ts";
 import { emptySellForm, receiveSellForm } from "../lib/sell-form.ts";
 
 const copy = brand.copy.sell;
@@ -35,12 +36,17 @@ let state = emptySellForm();
 let step = "reg";
 if (Astro.request.method === "POST") {
   const result = await receiveSellForm(Astro.request);
-  if (result === "saved") return Astro.redirect("/sell-your-car?sent=1", 303);
+  if ("sender" in result) {
+    rememberName(Astro.cookies, result.sender, "/sell-your-car");
+    return Astro.redirect("/sell-your-car?sent=1", 303);
+  }
   state = result;
   step = "details";
   Astro.response.status = 400;
 }
 const sent = Astro.url.searchParams.get("sent") === "1";
+// The thank-you has the sender's name in it.
+if (sent) Astro.response.headers.set("Cache-Control", "no-store");
 const lookup = lookupReady();
 const privacy = brand.legal?.find((l) => l.label === "Privacy")?.href;
 ---
@@ -48,7 +54,7 @@ const privacy = brand.legal?.find((l) => l.label === "Privacy")?.href;
 <Base title="Sell your car" description={`Sell your left hand drive car. ${copy.bandText}`} flush>
   <main class="page" data-at={sent ? "sent" : step}>
     {sent ? (
-      <div class="col"><Thanks /></div>
+      <div class="col"><Thanks name={rememberedName(Astro.cookies)} /></div>
     ) : (
       <form class="col sell-form" method="post" enctype="multipart/form-data" novalidate data-lookup={lookup ? "on" : undefined} data-max-photos={MAX_PHOTOS} data-max-bytes={MAX_PHOTO_BYTES}>
         <Hidden state={state} />

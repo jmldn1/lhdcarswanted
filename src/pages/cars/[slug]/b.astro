@@ -6,8 +6,8 @@
 // enquiry form, the sell band and more cars.
 //
 // The enquiry form works without JavaScript: it posts to this page, which
-// saves it (LEADS_DIR/enquiries) and redirects to a thank-you (so a refresh
-// can't send it twice). Emailing it to the dealer comes with the email sender.
+// saves it (LEADS_DIR/enquiries), emails it to the dealer and redirects to a
+// thank-you (so a refresh can't send it twice).
 import Base from "../../../layouts/Base.astro";
 import CarPhoto from "../../../components/CarPhoto.astro";
 import CarCard from "../../../components/CarCard.astro";
@@ -17,6 +17,7 @@ import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../
 import { lightboxJson } from "../../../lib/lightbox.ts";
 import { pageVideo } from "../../../lib/video.ts";
 import { readEnquiryForm, saveEnquiry, DIAL_CODES, type Enquiry, type EnquiryErrors } from "../../../lib/leads.ts";
+import { emailEnquiry } from "../../../lib/mail.ts";
 
 const car = await getCar(Astro.params.slug ?? "");
 if (!car) return new Response(null, { status: 404 });
@@ -37,7 +38,9 @@ if (Astro.request.method === "POST") {
   errors = read.errors;
   if (!Object.keys(errors).length) {
     try {
-      await saveEnquiry(read.data, { id: car.id, name, url: `/cars/${car.slug}` });
+      const about = { id: car.id, name, url: `/cars/${car.slug}` };
+      await saveEnquiry(read.data, about);
+      emailEnquiry(read.data, about);
       return Astro.redirect(`${here}?sent=1#enquire`, 303);
     } catch {
       failed = true;

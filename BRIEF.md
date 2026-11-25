@@ -117,7 +117,8 @@ site. Started 18 November 2026.
    /sell-your-car/b to compare, out of search engines; its leads say "Sent
    from /sell-your-car/b". **To decide:** A or B. It
    saves each request to `LEADS_DIR` and, since 25 Nov 2026, emails it to
-   `GMAIL_TO` through Gmail (src/lib/mail.ts; layouts A and B). **Waiting on
+   `GMAIL_TO` through Gmail (src/lib/mail.ts), like the landing pages' requests, car
+   enquiries and Contact messages. **Waiting on
    the client:** answers on
    reply time, promises, payment and collection, and whether they buy right
    hand drive cars (the form no longer asks). Then the remaining pages

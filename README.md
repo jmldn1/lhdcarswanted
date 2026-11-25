@@ -124,7 +124,7 @@ its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 | `SESSION_SECRET` | (none) | Signs the admin's sign-in cookie; set by `npm run admin:password` |
 | `DATA_DIR` | `data` | Test stock file and uploaded photos' originals |
 | `LEADS_DIR` | `data/leads` | Where sell requests (with their photos) and enquiries are saved. Customer data: outside the app folder in production, never in git |
-| `GMAIL_USER`, `GMAIL_PASS`, `GMAIL_TO` | not set: no emails | Emails each sell page request to `GMAIL_TO` through Gmail (`src/lib/mail.ts`); `GMAIL_PASS` is an app password |
+| `GMAIL_USER`, `GMAIL_PASS`, `GMAIL_TO` | not set: no emails | Emails each sell request, car enquiry and Contact message to `GMAIL_TO` through Gmail (`src/lib/mail.ts`); `GMAIL_PASS` is an app password |
 | `ANTHROPIC_API_KEY` | (none) | The admin's AI writing help (`src/lib/ai.ts`); without it the AI buttons don't show |
 | `AI_MODEL` | `claude-opus-5-5` | The Claude model the AI help uses |
 | `AI_DAILY_LIMIT` | `300` | AI requests a day (a cap on spending; counts again after a restart) |

@@ -1,7 +1,6 @@
 // Sell your car requests and enquiries about cars. Customer data: each is written to its own
 // folder under LEADS_DIR (default data/leads, git-ignored; outside the app in
-// production) and never logged. The sell pages' requests are also emailed to
-// the dealer (mail.ts).
+// production) and never logged. Each is also emailed to the dealer (mail.ts).
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";

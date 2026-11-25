@@ -12,7 +12,7 @@
 // jumps. Without JavaScript, without the lookup's keys, or when the server
 // finds a mistake in what was sent, the hero shows the full form instead
 // (mockup A). Either way the form posts here and is saved as a sell request
-// (LEADS_DIR/sell, with the page and the lookup's findings), then redirects
+// (LEADS_DIR/sell, with the page and the lookup's findings) and emailed, then redirects
 // to a thank-you so a refresh can't send it twice.
 import Base from "../layouts/Base.astro";
 import CarPhoto from "../components/CarPhoto.astro";
@@ -22,6 +22,7 @@ import { listCars, makeSlug } from "../lib/cars.ts";
 import { getLanding, factorList, landingName } from "../lib/landings.ts";
 import { lookupReady } from "../lib/vehicle-lookup.ts";
 import { readSellForm, saveSellRequest, DIAL_CODES, type SellRequest, type SellErrors } from "../lib/leads.ts";
+import { emailSellRequest } from "../lib/mail.ts";
 
 const landing = await getLanding(Astro.params.landing ?? "");
 if (!landing) return new Response(null, { status: 404 });
@@ -44,7 +45,9 @@ if (Astro.request.method === "POST") {
   if (!Object.keys(errors).length) {
     try {
       const lookup = String(form.get("lookup") ?? "").trim().slice(0, 300) || undefined;
-      await saveSellRequest({ ...read.data, source: here, lookup }, []);
+      const request = { ...read.data, source: here, lookup };
+      await saveSellRequest(request, []);
+      emailSellRequest(request);
       return Astro.redirect(`${here}?sent=1#value`, 303);
     } catch {
       failed = true;

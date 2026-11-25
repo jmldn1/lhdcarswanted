@@ -7,6 +7,7 @@
 import Base from "../layouts/Base.astro";
 import { brand } from "../brands/index.ts";
 import { readMessageForm, saveMessage, DIAL_CODES, TOPICS, type Message, type MessageErrors } from "../lib/leads.ts";
+import { emailMessage } from "../lib/mail.ts";
 
 let values: Partial<Message> = { topic: "Buying a car", dial: "+44" };
 let errors: MessageErrors = {};
@@ -21,6 +22,7 @@ if (Astro.request.method === "POST") {
   if (!Object.keys(errors).length) {
     try {
       await saveMessage(read.data);
+      emailMessage(read.data);
       return Astro.redirect("/contact?sent=1#message", 303);
     } catch {
       failed = true;

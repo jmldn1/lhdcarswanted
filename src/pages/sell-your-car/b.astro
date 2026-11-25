@@ -22,6 +22,7 @@ import Thanks from "../../components/sell/Thanks.astro";
 import { brand } from "../../brands/index.ts";
 import { lookupReady } from "../../lib/vehicle-lookup.ts";
 import { MAX_PHOTOS, MAX_PHOTO_BYTES } from "../../lib/leads.ts";
+import { rememberName, rememberedName } from "../../lib/first-name.ts";
 import { emptySellForm, receiveSellForm } from "../../lib/sell-form.ts";
 
 const copy = brand.copy.sell;
@@ -32,12 +33,17 @@ let state = emptySellForm();
 let returned = false;
 if (Astro.request.method === "POST") {
   const result = await receiveSellForm(Astro.request, here);
-  if (result === "saved") return Astro.redirect(`${here}?sent=1`, 303);
+  if ("sender" in result) {
+    rememberName(Astro.cookies, result.sender, "/sell-your-car");
+    return Astro.redirect(`${here}?sent=1`, 303);
+  }
   state = result;
   returned = true;
   Astro.response.status = 400;
 }
 const sent = Astro.url.searchParams.get("sent") === "1";
+// The thank-you has the sender's name in it.
+if (sent) Astro.response.headers.set("Cache-Control", "no-store");
 const lookup = lookupReady();
 const privacy = brand.legal?.find((l) => l.label === "Privacy")?.href;
 const { values, errors } = state;
@@ -57,7 +63,7 @@ const asks = returned || !lookup;
 
       <div class="card">
         {sent ? (
-          <Thanks />
+          <Thanks name={rememberedName(Astro.cookies)} />
         ) : (
           <form class="sell-form" method="post" action={here} enctype="multipart/form-data" novalidate data-lookup={lookup ? "on" : undefined} data-max-photos={MAX_PHOTOS} data-max-bytes={MAX_PHOTO_BYTES} data-car={asks ? "asked" : "reg"}>
             <Hidden state={state} />

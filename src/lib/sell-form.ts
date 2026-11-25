@@ -1,7 +1,7 @@
 // What both sell page layouts (/sell-your-car and /sell-your-car/b) do with a
 // request that's been sent, and the choices their fields offer.
 import { emailSellRequest } from "./mail.ts";
-import { fullPhone, readSellForm, saveSellRequest, MAX_PHOTOS, MAX_PHOTO_BYTES, type SellRequest, type SellErrors } from "./leads.ts";
+import { readSellForm, saveSellRequest, MAX_PHOTOS, MAX_PHOTO_BYTES, type SellRequest, type SellErrors } from "./leads.ts";
 
 export const MAKES = [
   "Alfa Romeo", "Aston Martin", "Audi", "Bentley", "BMW", "Citroën", "Ferrari", "Fiat", "Ford", "Jaguar",
@@ -20,15 +20,15 @@ export interface SellFormState {
 }
 export const emptySellForm = (): SellFormState => ({ values: { unit: "miles", registered: "UK", dial: "+44" }, errors: {}, failed: false });
 
-/** Saves what was sent and emails it to the dealer: "saved", or the form's state to show again. */
-export async function receiveSellForm(request: Request, source?: string): Promise<"saved" | SellFormState> {
+/** Saves what was sent and emails it to the dealer. Returns who sent it, or the form's state to show again. */
+export async function receiveSellForm(request: Request, source?: string): Promise<{ sender: string } | SellFormState> {
   const size = Number(request.headers.get("content-length") ?? 0);
   if (size > (MAX_PHOTOS + 1) * MAX_PHOTO_BYTES) {
     return { ...emptySellForm(), errors: { photos: "That's too much to send at once. Try fewer photos, or send them on WhatsApp." } };
   }
   const form = await request.formData();
   // Left empty by people; filled by bots. Bots get the thank-you anyway.
-  if (String(form.get("website") ?? "")) return "saved";
+  if (String(form.get("website") ?? "")) return { sender: "" };
   const { data, photos, errors } = readSellForm(form);
   const lookup = String(form.get("lookup") ?? "").trim().slice(0, 300) || undefined;
   const values = { ...data, lookup };
@@ -36,9 +36,8 @@ export async function receiveSellForm(request: Request, source?: string): Promis
   try {
     const request = { ...values, source };
     await saveSellRequest(request, photos);
-    // Not waited for: the seller isn't kept while photos are resized and sent.
-    void emailSellRequest(request, fullPhone(data.dial, data.phone), photos);
-    return "saved";
+    emailSellRequest(request, photos);
+    return { sender: data.name };
   } catch {
     return { values, errors, failed: true };
   }
