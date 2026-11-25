@@ -15,6 +15,12 @@ export interface Palette {
   band: string;
   bandFg: string;
   bandMuted: string;
+  /** The footer; its accent is the logo, links under the pointer and focus rings. */
+  foot: string;
+  footFg: string;
+  footMuted: string;
+  footLine: string;
+  footAccent: string;
 }
 
 export interface Phone {

@@ -14,6 +14,11 @@
   --color-band: var(--brand-band);
   --color-band-fg: var(--brand-band-fg);
   --color-band-muted: var(--brand-band-muted);
+  --color-foot: var(--brand-foot);
+  --color-foot-fg: var(--brand-foot-fg);
+  --color-foot-muted: var(--brand-foot-muted);
+  --color-foot-line: var(--brand-foot-line);
+  --color-foot-accent: var(--brand-foot-accent);
   --font-display: var(--brand-font-display);
   --font-body: var(--brand-font-body);
 }

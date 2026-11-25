@@ -89,6 +89,10 @@ const sales = brand.contact.phones[0];
 </script>
 
 <style>
+  /* A page shorter than the screen: the footer's colour carries on below it. */
+  :global(html) {
+    background: var(--color-foot);
+  }
   .site-head {
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-line);

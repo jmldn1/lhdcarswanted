@@ -51,8 +51,9 @@ const href = `https://wa.me/${number}${car ? `?text=${encodeURIComponent(car)}` 
     background: #17883f;
   }
   .wa:focus-visible {
-    outline: 3px solid var(--color-fg);
-    outline-offset: 2px;
+    /* Seen on the light page and the dark footer alike. */
+    outline: 3px solid #fff;
+    box-shadow: 0 0 0 6px #16181d;
   }
   .wa svg {
     width: 28px;

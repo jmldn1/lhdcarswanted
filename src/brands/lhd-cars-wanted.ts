@@ -18,11 +18,13 @@ export const lhdCarsWanted: Brand = {
       bg: "#f4f5f7", surface: "#ffffff", fg: "#16181d", muted: "#5d6470",
       line: "#dcdfe5", accent: "#2f5f8a", accentInk: "#ffffff", picked: "#e6eef6",
       band: "#16202e", bandFg: "#ffffff", bandMuted: "#c7d1de",
+      foot: "#0f1723", footFg: "#ffffff", footMuted: "#b4bfcc", footLine: "#2b3647", footAccent: "#8fbbe3",
     },
     dark: {
       bg: "#101216", surface: "#191c22", fg: "#e8eaee", muted: "#9ba3af",
       line: "#2c313a", accent: "#7fb0dc", accentInk: "#101216", picked: "#1f2f40",
       band: "#0c121b", bandFg: "#e8eaee", bandMuted: "#b4bfcc",
+      foot: "#090d14", footFg: "#e8eaee", footMuted: "#a6b0bd", footLine: "#2c313a", footAccent: "#7fb0dc",
     },
   },
   fonts: {
