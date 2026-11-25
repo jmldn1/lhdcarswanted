@@ -43,7 +43,8 @@ export const lhdCarsWanted: Brand = {
   },
   features: {
     sellForm: true,
-    carsWanted: true,
+    // Until /cars-wanted is built: its buttons would lead to a 404.
+    carsWanted: false,
     soldGallery: false,
     legacyRedirects: true,
     blog: true,
