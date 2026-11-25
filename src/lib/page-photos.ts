@@ -13,7 +13,7 @@ import { db, hasDb } from "./db.ts";
 export const PLACES = [
   { key: "homeHero", label: "Homepage: the large photo at the top", page: "/", automatic: "the featured car's photo" },
   { key: "homeSell", label: "Homepage: the \"Got a car to sell?\" band", page: "/#sell", automatic: "the standard selling photo" },
-  { key: "sellSide", label: "Sell your car: the photo beside the form", page: "/sell-your-car", automatic: "a car from stock" },
+  { key: "sellSide", label: "Sell your car: the photo beside the form (not shown in the current layout)", page: "/sell-your-car", automatic: "a car from stock" },
   { key: "aboutMain", label: "About: the first photo", page: "/about", automatic: "the featured car" },
   { key: "aboutSecond", label: "About: the second photo", page: "/about", automatic: "another car from stock" },
 ] as const;

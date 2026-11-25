@@ -1,0 +1,19 @@
+---
+// What went wrong when the server sends the form back.
+import { brand } from "../../brands/index.ts";
+import type { SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+}
+const { errors, failed } = Astro.props.state;
+const n = Object.keys(errors).length;
+const sales = brand.contact.phones[0];
+---
+
+{n > 0 && <p class="alert" role="alert">Please check the {n === 1 ? "field" : "fields"} marked below.</p>}
+{failed && (
+  <p class="alert" role="alert">
+    Sorry, that didn't send. Please try again{sales?.tel && <>, or call <a href={`tel:${sales.tel}`}>{sales.display}</a></>}.
+  </p>
+)}

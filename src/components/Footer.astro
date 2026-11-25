@@ -1,0 +1,235 @@
+---
+// The footer on every public page: who we are, links, contact, and the small
+// print. Everything comes from the brand; a part it doesn't have is left out.
+import { brand } from "../brands/index.ts";
+
+interface Props {
+  /** The page ends in a full-width band: no gap above the footer. */
+  flush?: boolean;
+}
+const { flush = false } = Astro.props;
+const { features, copy, contact } = brand;
+
+const columns = [
+  {
+    title: features.sellForm ? "Buy and sell" : "Cars",
+    links: [
+      ["/cars", "Cars for sale"],
+      features.sellForm && ["/sell-your-car", "Sell your car"],
+      features.blog && ["/blog", "Blog"],
+    ],
+  },
+  {
+    title: "Company",
+    links: [copy.about && ["/about", "About us"], ["/contact", "Contact us"]],
+  },
+].map((c) => ({ ...c, links: c.links.filter(Boolean) as [string, string][] }));
+
+const year = new Date().getFullYear();
+---
+
+<footer class:list={["site-foot", { flush, beside: contact.whatsapp }]}>
+  <div class="wrap">
+    <div class="cols">
+      <div class="who">
+        <a class="logo" href="/" aria-label={`${brand.name} home`}>
+          <span class="top">{brand.logo.top}</span>
+          <span class="bottom">{brand.logo.bottom}</span>
+        </a>
+        {copy.footer && <p>{copy.footer}</p>}
+      </div>
+      <nav class="links" aria-label="Footer">
+        {columns.map((c) => (
+          <div>
+            <h2>{c.title}</h2>
+            <ul>
+              {c.links.map(([href, label]) => <li><a href={href}>{label}</a></li>)}
+            </ul>
+          </div>
+        ))}
+      </nav>
+      <div class="contact">
+        <h2>Contact</h2>
+        <ul>
+          {contact.phones.map((p) => (
+            <li>{contact.phones.length > 1 && `${p.label}: `}<a class="tel" href={`tel:${p.tel}`}>{p.display}</a></li>
+          ))}
+          <li><a href={`mailto:${contact.email}`}>{contact.email}</a></li>
+          <li>{contact.address}</li>
+          <li>{contact.hours}{contact.viewings && <>. {contact.viewings}</>}</li>
+        </ul>
+      </div>
+    </div>
+    <div class="small">
+      <p>© {year} {brand.name}{brand.company && <>. {brand.company}</>}</p>
+      {brand.legal && (
+        <ul>
+          {brand.legal.map((l) => <li>{l.href ? <a href={l.href}>{l.label}</a> : `[${l.label}]`}</li>)}
+        </ul>
+      )}
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-foot {
+    margin-top: 64px;
+    border-top: 1px solid var(--color-line);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+  .site-foot.flush {
+    margin-top: 0;
+  }
+  p,
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .logo {
+    display: inline-grid;
+    line-height: 1;
+    color: var(--color-fg);
+  }
+  .logo:hover {
+    text-decoration: none;
+  }
+  .logo .top {
+    font: 700 34px/0.95 var(--font-display);
+    letter-spacing: 0.06em;
+    color: var(--color-accent);
+  }
+  .logo .bottom {
+    font: 600 14px/1.3 var(--font-display);
+    letter-spacing: 0.14em;
+  }
+  .who p {
+    max-width: 320px;
+    margin-top: 14px;
+  }
+  h2 {
+    margin: 0;
+    font: 700 20px/1.2 var(--font-display);
+    color: var(--color-fg);
+  }
+  .tel {
+    color: var(--color-fg);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  li {
+    overflow-wrap: anywhere;
+  }
+
+  /* Phones: each link tall enough to tap (44px), the two lists side by side. */
+  .cols {
+    display: grid;
+    gap: 24px;
+    padding-block: 32px 20px;
+  }
+  .links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+  .cols h2 {
+    margin-bottom: 4px;
+  }
+  .cols li {
+    padding-block: 10px;
+  }
+  .cols li a {
+    padding-block: 12px;
+  }
+  .small {
+    display: grid;
+    padding-block: 8px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-line);
+    font-size: 14px;
+  }
+  .small ul {
+    display: flex;
+    gap: 24px;
+    order: -1;
+  }
+  .small li {
+    padding-block: 11px;
+  }
+  .small li a {
+    padding-block: 11px;
+  }
+
+  @media (min-width: 640px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 36px 48px;
+      padding-block: 44px 40px;
+    }
+    .links {
+      order: 1;
+      gap: 48px;
+    }
+    .contact {
+      order: 2;
+    }
+    .cols h2 {
+      margin-bottom: 8px;
+    }
+    .cols li {
+      padding-block: 6px;
+    }
+    .cols li a {
+      padding-block: 6px;
+    }
+    .small {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+      padding-block: 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    .small ul {
+      order: 0;
+    }
+  }
+  /* On a tablet the two lists sit beside the logo, contact below them. */
+  @media (min-width: 640px) and (max-width: 959px) {
+    .contact {
+      grid-column: 1 / -1;
+    }
+    .contact ul {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 48px;
+    }
+  }
+  @media (min-width: 960px) {
+    .cols {
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 2fr) minmax(max-content, 1.3fr);
+    }
+  }
+
+  /* The WhatsApp button (56px, 16px from the edge) is beside the text, never
+     over it. Wider screens have room in the margin. On phones it can sit
+     higher, above a Call bar, so the contact lines keep clear too. */
+  @media (max-width: 1351px) {
+    .beside .small {
+      padding-right: calc(72px + env(safe-area-inset-right, 0px));
+    }
+  }
+  @media (max-width: 639px) {
+    .beside .contact {
+      padding-right: calc(72px + env(safe-area-inset-right, 0px));
+    }
+  }
+</style>

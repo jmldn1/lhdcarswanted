@@ -1,0 +1,24 @@
+---
+import { MAX_PHOTOS } from "../../lib/leads.ts";
+import { fieldState, type SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+}
+const { errors } = Astro.props.state;
+---
+
+<div>
+  <span class="lbl" id="photos-lbl">Photos <span class="opt">(optional, they help us price it)</span></span>
+  <label class="drop">
+    <span class="drop-icon" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" /><circle cx="12" cy="13" r="4" /></svg>
+    </span>
+    <span>
+      <strong data-photo-count aria-live="polite">Choose photos</strong>
+      <span class="hint">Outside, inside and the dashboard, up to {MAX_PHOTOS}. Or send them on WhatsApp later.</span>
+    </span>
+    <input id="photos" class="sr" type="file" name="photos" accept="image/*" multiple aria-labelledby="photos-lbl" {...fieldState(errors, "photos")} />
+  </label>
+  <p class="err" id="photos-err" hidden={!errors.photos}>{errors.photos}</p>
+</div>

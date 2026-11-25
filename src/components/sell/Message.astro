@@ -1,0 +1,13 @@
+---
+import type { SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+}
+const { values } = Astro.props.state;
+---
+
+<div>
+  <label class="lbl" for="message">Anything we should know? <span class="opt">(optional)</span></label>
+  <textarea id="message" name="message" class="in" rows="3" maxlength="4000" placeholder="Condition, service history, where the car is now…">{values.message}</textarea>
+</div>

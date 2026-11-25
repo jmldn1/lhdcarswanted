@@ -1,0 +1,48 @@
+---
+import WhatsAppLine from "../WhatsAppLine.astro";
+import { brand } from "../../brands/index.ts";
+---
+
+<section class="thanks" role="status">
+  <span class="done-icon" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+  </span>
+  <h1>Thanks, we've got your car's details</h1>
+  <p class="reply">{brand.copy.sell?.thanks}</p>
+  <p>Photos help us give you a firmer price. If you haven't sent any yet:</p>
+  <WhatsAppLine text="Send photos on WhatsApp" />
+  <p><a href="/cars">See the cars for sale</a></p>
+</section>
+
+<style>
+  h1 {
+    font: 700 clamp(36px, 4.4vw, 52px)/1.02 var(--font-display);
+    margin: 0;
+  }
+  p {
+    margin: 0;
+  }
+  .reply {
+    margin: 12px 0 20px;
+    font-size: clamp(17px, 1.6vw, 19px);
+    color: var(--color-muted);
+  }
+  .done-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 20px;
+    border-radius: 50%;
+    background: var(--color-picked);
+    color: var(--color-accent);
+    display: grid;
+    place-items: center;
+  }
+  p a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: inherit;
+    font-weight: 600;
+    text-underline-offset: 4px;
+  }
+</style>

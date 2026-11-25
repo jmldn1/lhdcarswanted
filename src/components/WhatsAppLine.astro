@@ -1,0 +1,41 @@
+---
+// WhatsApp as one quiet line: the small icon and a few words. Nothing when the
+// brand has no WhatsApp number.
+import { brand } from "../brands/index.ts";
+import { WHATSAPP_ICON } from "../lib/whatsapp.ts";
+
+interface Props {
+  text?: string;
+}
+const { text = "Or message us on WhatsApp" } = Astro.props;
+const number = brand.contact.whatsapp;
+---
+
+{number && (
+  <a class="wa-line" href={`https://wa.me/${number}`} target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d={WHATSAPP_ICON} /></svg>
+    {text}
+  </a>
+)}
+
+<style>
+  .wa-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-weight: 600;
+    color: var(--color-fg);
+    text-decoration: none;
+  }
+  .wa-line:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .wa-line svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    fill: #1da851;
+  }
+</style>

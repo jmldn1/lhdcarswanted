@@ -1,7 +1,7 @@
 // Sell your car requests and enquiries about cars. Customer data: each is written to its own
 // folder under LEADS_DIR (default data/leads, git-ignored; outside the app in
-// production) and never logged. Emailing them to the dealer comes with this
-// site's own email sender.
+// production) and never logged. The sell pages' requests are also emailed to
+// the dealer (mail.ts).
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -32,7 +32,7 @@ export interface SellRequest {
   dial: string;
   phone: string;
   message: string;
-  /** The landing page it was sent from ("/sell-your-porsche-911"), if any. */
+  /** The landing page ("/sell-your-porsche-911") or sell page layout B it was sent from, if any. */
   source?: string;
   /** What the registration lookup found, in one line, if one was made. */
   lookup?: string;
@@ -92,7 +92,7 @@ async function newLeadDir(kind: LeadKind) {
 }
 
 /** The number as one would dial it: the code, then the number without its leading 0. */
-const fullPhone = (dial: string, phone: string) => (phone ? `${dial} ${phone.replace(/^0+/, "")}` : "");
+export const fullPhone = (dial: string, phone: string) => (phone ? `${dial} ${phone.replace(/^0+/, "")}` : "");
 
 /** Writes one request (and its photos, as sent) to its own folder. Returns its id. */
 export async function saveSellRequest(data: SellRequest, photos: File[]): Promise<string> {

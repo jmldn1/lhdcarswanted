@@ -9,6 +9,9 @@ export const lhdCarsWanted: Brand = {
   id: "lhd-cars-wanted",
   name: "LHD Cars Wanted",
   domain: "www.lhdcarswanted.co.uk",
+  company: "[COMPANY NAME AND NUMBER]",
+  // Their pages aren't written yet: give each its href when it is.
+  legal: [{ label: "Privacy" }, { label: "Terms" }],
   logo: { top: "LHD", bottom: "CARS WANTED" },
   colors: {
     light: {
@@ -52,12 +55,8 @@ export const lhdCarsWanted: Brand = {
       bandHeading: "Got a car to sell? Get a free valuation today",
       bandText: "Top cash prices paid, outstanding finance settled, secure payment and free UK collection.",
       trust: "[No obligation] · your details stay with us",
-      intro:
-        "Tell us about your left hand drive car and we'll come back with a price. [We usually reply within REPLY TIME.]",
-      promises: [
-        "Free valuation and top cash prices paid",
-        "Outstanding finance settled, secure payment and free UK collection",
-      ],
+      intro: "Free valuation. Start with your registration and we'll come back with a price.",
+      introLookup: "Free valuation. Start with your registration and we'll find your car.",
       steps: [
         { title: "We look at your car's details", text: "And the photos, if you sent any." },
         { title: "We come back with a price", text: "[Usually within REPLY TIME]" },
@@ -93,6 +92,7 @@ export const lhdCarsWanted: Brand = {
     },
     blogIntro: "[Blog intro: what you write about, in a sentence or two]",
     contactIntro: "Call, WhatsApp or email us, or send a message below. [We usually reply within REPLY TIME.]",
+    footer: "Left hand drive cars, bought and sold. Free valuation, secure payment and free UK collection.",
   },
   cardPhoto: { fit: "cover", ratio: "3 / 2" },
 };

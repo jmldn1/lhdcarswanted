@@ -1,0 +1,22 @@
+---
+import { fieldState, type SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+}
+const { values, errors } = Astro.props.state;
+---
+
+<div data-mileage>
+  <label class="lbl" for="mileage">Mileage <span class="opt">(optional)</span></label>
+  <div class="joined">
+    <input id="mileage" name="mileage" class="in" value={values.mileage} inputmode="numeric" maxlength="12" placeholder="e.g. 42,000" autocomplete="off" {...fieldState(errors, "mileage")} />
+    <fieldset class="units">
+      <legend class="sr">Mileage in</legend>
+      {(["miles", "km"] as const).map((u) => (
+        <label><input class="sr" type="radio" name="unit" value={u} checked={values.unit === u} /><span>{u}</span></label>
+      ))}
+    </fieldset>
+  </div>
+  <p class="err" id="mileage-err" hidden={!errors.mileage}>{errors.mileage}</p>
+</div>

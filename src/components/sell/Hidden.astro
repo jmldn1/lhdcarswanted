@@ -1,0 +1,16 @@
+---
+// The sell form's out-of-sight fields: what the lookup found, left hand drive
+// (assumed, as on the landing pages), and the honeypot.
+import type { SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+}
+const { values } = Astro.props.state;
+---
+
+<input type="hidden" name="lookup" value={values.lookup} />
+<input type="hidden" name="drive" value="Left hand drive" />
+<div class="bot" aria-hidden="true">
+  <label>Leave this empty <input name="website" tabindex="-1" autocomplete="off" /></label>
+</div>

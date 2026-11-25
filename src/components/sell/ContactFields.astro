@@ -1,0 +1,38 @@
+---
+// Where to reply: name, email and (optionally) phone, in a two-column grid.
+import { DIAL_CODES } from "../../lib/leads.ts";
+import { fieldState, type SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+  /** The name on a row of its own, email and phone sharing the next. */
+  nameWide?: boolean;
+}
+const { state, nameWide = false } = Astro.props;
+const { values, errors } = state;
+---
+
+<div class="two" data-contact>
+  <div class:list={[{ wide: nameWide }]}>
+    <label class="lbl" for="name">Your name</label>
+    <input id="name" name="name" class="in" value={values.name} placeholder="First and last name" autocomplete="name" {...fieldState(errors, "name")} />
+    <p class="err" id="name-err" hidden={!errors.name}>{errors.name}</p>
+  </div>
+  <div>
+    <label class="lbl" for="email">Email</label>
+    <input id="email" name="email" type="email" class="in" value={values.email} placeholder="you@example.com" autocomplete="email" {...fieldState(errors, "email")} />
+    <p class="err" id="email-err" hidden={!errors.email}>{errors.email}</p>
+  </div>
+  <div class:list={[{ alone: !nameWide }]}>
+    <label class="lbl" for="phone">Phone <span class="opt">(optional)</span></label>
+    <div class="joined">
+      <select name="dial" class="dial" aria-label="Country code" autocomplete="tel-country-code">
+        {DIAL_CODES.map(([code]) => (
+          <option value={code} selected={values.dial === code}>{code}</option>
+        ))}
+      </select>
+      <input id="phone" name="phone" type="tel" class="in" value={values.phone} placeholder="07400 123456" autocomplete="tel-national" {...fieldState(errors, "phone")} />
+    </div>
+    <p class="err" id="phone-err" hidden={!errors.phone}>{errors.phone}</p>
+  </div>
+</div>

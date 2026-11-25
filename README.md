@@ -95,8 +95,10 @@ its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 - `src/lib/photo-queue.ts`: admin photo uploads, made web-ready in the background.
 - `src/pages/admin/`, `src/layouts/Admin.astro`, `src/components/admin/`: the admin.
 - `src/pages/index.astro`: the homepage (v2 mockup concept C).
-- `src/pages/sell-your-car.astro`: the sell form (from the sell page mockup), saving
-  through `src/lib/leads.ts`. Works without JavaScript. Its words are in the
+- `src/pages/sell-your-car.astro`: the sell form (layout A; `/sell-your-car/b` is
+  layout B, to compare), saving through `src/lib/leads.ts`. Both share
+  `src/components/sell/`, `src/lib/sell-form.ts`, `src/scripts/sell-form.ts` and
+  `src/styles/sell-form.css`. Works without JavaScript. Its words are in the
   brand file (`copy.sell`).
 - `src/pages/cars/`: /cars (grid, quick look, `?make=` filter) and the car page
   (layout A; `/cars/<car>/b` is layout B with an enquiry form, to compare).
@@ -122,6 +124,7 @@ its CSS at all. Linux (the VPS) has no drive letters, so it's unaffected.
 | `SESSION_SECRET` | (none) | Signs the admin's sign-in cookie; set by `npm run admin:password` |
 | `DATA_DIR` | `data` | Test stock file and uploaded photos' originals |
 | `LEADS_DIR` | `data/leads` | Where sell requests (with their photos) and enquiries are saved. Customer data: outside the app folder in production, never in git |
+| `GMAIL_USER`, `GMAIL_PASS`, `GMAIL_TO` | not set: no emails | Emails each sell page request to `GMAIL_TO` through Gmail (`src/lib/mail.ts`); `GMAIL_PASS` is an app password |
 | `ANTHROPIC_API_KEY` | (none) | The admin's AI writing help (`src/lib/ai.ts`); without it the AI buttons don't show |
 | `AI_MODEL` | `claude-opus-5-5` | The Claude model the AI help uses |
 | `AI_DAILY_LIMIT` | `300` | AI requests a day (a cap on spending; counts again after a restart) |

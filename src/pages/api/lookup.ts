@@ -1,4 +1,4 @@
-// The landing pages' registration lookup (src/lib/vehicle-lookup.ts):
+// The landing pages' and Sell your car's registration lookup (src/lib/vehicle-lookup.ts):
 // POST {"reg": "LX59 ABC"} → {"found": true, "vehicle": {…}} | {"found": false}
 // | {"error": "…"}. JSON only, from this site's own pages, and at most 20
 // lookups per visitor in 10 minutes, so the DVLA and DVSA quotas can't be

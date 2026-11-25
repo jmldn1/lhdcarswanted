@@ -46,11 +46,11 @@ export interface SellCopy {
   /** The homepage's sell band. */
   bandHeading: string;
   bandText: string;
-  /** Small line above the heading. */
+  /** Small line under the send button. */
   trust: string;
+  /** Under the sell page's heading; introLookup when the registration lookup is on. */
   intro: string;
-  /** Ticked lines above the send button. */
-  promises: string[];
+  introLookup: string;
   /** "What happens next", in order. */
   steps: { title: string; text: string }[];
   /** Under the thank-you heading. */
@@ -64,6 +64,10 @@ export interface Brand {
   id: string;
   name: string;
   domain: string;
+  /** The registered company's name and number, for the footer's small print. */
+  company?: string;
+  /** The small print's pages; without an address one shows in [brackets], not as a link. */
+  legal?: { label: string; href?: string }[];
   /** Wordmark: a first line and a second smaller line (logo concept E). */
   logo: { top: string; bottom: string };
   colors: { light: Palette; dark: Palette };
@@ -100,6 +104,8 @@ export interface Brand {
     blogIntro?: string;
     /** Under the /contact heading. */
     contactIntro?: string;
+    /** Under the footer's logo: a sentence or two. */
+    footer?: string;
   };
   /**
    * How car photos sit in the /cars grid frame. "contain" shows the whole

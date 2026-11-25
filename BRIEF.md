@@ -110,12 +110,19 @@ site. Started 18 November 2026.
    address and opening hours (then a map), and the blog's first posts.
    Not built yet: photos inside a post (only a cover), the privacy page.
 5. ~~Sell your car form~~ Built 18 Nov 2026 at /sell-your-car from the mockup
-   (https://claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv), to be refined. It
-   saves each request to `LEADS_DIR`; still to do: email each one to the
-   dealer (needs this site's own email sender), and the client's answers on
+   (https://claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv); since 25 Nov 2026 in
+   layout A, for now (https://claude.ai/artifact/74q48axCbeYVZZ1URB8Dm6):
+   the registration first (the landing pages' lookup), then where to send
+   the price; WhatsApp as one line. Layout B (one short form) is at
+   /sell-your-car/b to compare, out of search engines; its leads say "Sent
+   from /sell-your-car/b". **To decide:** A or B. It
+   saves each request to `LEADS_DIR` and, since 25 Nov 2026, emails it to
+   `GMAIL_TO` through Gmail (src/lib/mail.ts; layouts A and B). **Waiting on
+   the client:** answers on
    reply time, promises, payment and collection, and whether they buy right
-   hand drive cars. Then the remaining pages (privacy first: the form links
-   to it), then redirects from every old URL.
+   hand drive cars (the form no longer asks). Then the remaining pages
+   (privacy first: the form links to it once the brand's `legal` has its
+   address), then redirects from every old URL.
 6. Car page photos: built 19 Nov 2026 with a row of thumbnails under the
    main photo and full-screen viewing with lightGallery 2.9.0, as on London
    LHD Centre v1. **Before launch:** the npm build is the free GPLv3 one,

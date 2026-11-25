@@ -1,0 +1,49 @@
+---
+// The car, when the registration lookup can't say: where it's registered,
+// make, model, year and (optionally) its registration and mileage.
+import Mileage from "./Mileage.astro";
+import { MAKES, PLACES, fieldState, type SellFormState } from "../../lib/sell-form.ts";
+
+interface Props {
+  state: SellFormState;
+  /** A box for the registration (the page's own is out of sight). */
+  reg2?: boolean;
+  mileage?: boolean;
+}
+const { state, reg2 = false, mileage = false } = Astro.props;
+const { values, errors } = state;
+---
+
+<fieldset class="choice">
+  <legend class="lbl">Where is it registered?</legend>
+  <div class="pills">
+    {PLACES.map(([v, label]) => (
+      <label class="pill"><input class="sr" type="radio" name="registered" value={v} checked={values.registered === v} /><span>{label}</span></label>
+    ))}
+  </div>
+</fieldset>
+{reg2 && (
+  <div class="js-only" data-reg2>
+    <label class="lbl" for="reg2">Registration or VIN <span class="opt">(optional)</span></label>
+    <input id="reg2" class="in caps" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" />
+  </div>
+)}
+<div class="two">
+  <div>
+    <label class="lbl" for="make">Make</label>
+    <input id="make" name="make" class="in" list="makes" value={values.make} placeholder="e.g. Porsche" autocomplete="off" {...fieldState(errors, "make")} />
+    <datalist id="makes">{MAKES.map((m) => <option value={m} />)}</datalist>
+    <p class="err" id="make-err" hidden={!errors.make}>{errors.make}</p>
+  </div>
+  <div>
+    <label class="lbl" for="model">Model</label>
+    <input id="model" name="model" class="in" value={values.model} placeholder="e.g. 911 Carrera" autocomplete="off" {...fieldState(errors, "model")} />
+    <p class="err" id="model-err" hidden={!errors.model}>{errors.model}</p>
+  </div>
+  <div class="alone">
+    <label class="lbl" for="year">Year <span class="opt">(optional)</span></label>
+    <input id="year" name="year" class="in" value={values.year} inputmode="numeric" maxlength="4" placeholder="e.g. 2015" autocomplete="off" {...fieldState(errors, "year")} />
+    <p class="err" id="year-err" hidden={!errors.year}>{errors.year}</p>
+  </div>
+  {mileage && <Mileage state={state} />}
+</div>

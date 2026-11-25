@@ -1,0 +1,409 @@
+---
+// Sell your car, layout B of the sell page mockups
+// (claude.ai/artifact/74q48axCbeYVZZ1URB8Dm6), built beside layout A
+// (../sell-your-car.astro) to compare; kept out of search engines. What
+// happens next on the left, one short form on the right.
+//
+// The registration is looked up as soon as it's typed, and the car shows under
+// it. Make, model and so on are asked for only when it can't be found, the
+// seller says it's on foreign plates or none, there's no lookup, or there's no
+// JavaScript. Requests are saved as on layout A, marked "/sell-your-car/b".
+import "../../styles/sell-form.css";
+import Base from "../../layouts/Base.astro";
+import WhatsAppLine from "../../components/WhatsAppLine.astro";
+import CarFields from "../../components/sell/CarFields.astro";
+import ContactFields from "../../components/sell/ContactFields.astro";
+import Hidden from "../../components/sell/Hidden.astro";
+import Message from "../../components/sell/Message.astro";
+import Mileage from "../../components/sell/Mileage.astro";
+import Photos from "../../components/sell/Photos.astro";
+import Problems from "../../components/sell/Problems.astro";
+import Thanks from "../../components/sell/Thanks.astro";
+import { brand } from "../../brands/index.ts";
+import { lookupReady } from "../../lib/vehicle-lookup.ts";
+import { MAX_PHOTOS, MAX_PHOTO_BYTES } from "../../lib/leads.ts";
+import { emptySellForm, receiveSellForm } from "../../lib/sell-form.ts";
+
+const copy = brand.copy.sell;
+if (!brand.features.sellForm || !copy) return new Response(null, { status: 404 });
+
+const here = "/sell-your-car/b";
+let state = emptySellForm();
+let returned = false;
+if (Astro.request.method === "POST") {
+  const result = await receiveSellForm(Astro.request, here);
+  if (result === "saved") return Astro.redirect(`${here}?sent=1`, 303);
+  state = result;
+  returned = true;
+  Astro.response.status = 400;
+}
+const sent = Astro.url.searchParams.get("sent") === "1";
+const lookup = lookupReady();
+const privacy = brand.legal?.find((l) => l.label === "Privacy")?.href;
+const { values, errors } = state;
+// With scripts, the car's fields start hidden unless they're needed. (Without,
+// they always show: CSS.)
+const asks = returned || !lookup;
+---
+
+<Base title="Sell your car" description={`Sell your left hand drive car. ${copy.bandText}`} noindex>
+  <main class="wrap page-b">
+    <p class="compare">Layout B, for comparison · <a href="/sell-your-car">See layout A</a></p>
+    <div class="layout">
+      <div class="intro">
+        {sent ? <p class="h1">Sell your car</p> : <h1>Sell your car</h1>}
+        <p class="sub">{copy.bandText}</p>
+      </div>
+
+      <div class="card">
+        {sent ? (
+          <Thanks />
+        ) : (
+          <form class="sell-form" method="post" action={here} enctype="multipart/form-data" novalidate data-lookup={lookup ? "on" : undefined} data-max-photos={MAX_PHOTOS} data-max-bytes={MAX_PHOTO_BYTES} data-car={asks ? "asked" : "reg"}>
+            <Hidden state={state} />
+            <h2>Get a free valuation</h2>
+            <Problems state={state} />
+
+            <div class="car">
+              <div data-reg-field>
+                <label class="lbl" for="reg">Registration</label>
+                <input id="reg" name="reg" class="plate" value={values.reg} placeholder="AB12 CDE" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" aria-describedby="reg-err" />
+                <p class="err" id="reg-err" role="alert" hidden></p>
+              </div>
+              <div aria-live="polite">
+                <p class="hint" data-out="busy" hidden></p>
+                <div class="found" data-found hidden>
+                  <span class="found-car"><strong data-out="title"></strong><span data-out="facts"></span></span>
+                </div>
+                <p class="note" data-out="note" hidden></p>
+              </div>
+              <button class="link js-only" type="button" data-act="switch" hidden={!lookup}>
+                {asks ? "Use a UK registration instead" : "Foreign plates or none? Tell us the make and model"}
+              </button>
+            </div>
+
+            <div class="fields car-fields" data-car-fields>
+              <CarFields state={state} />
+            </div>
+
+            <ContactFields state={state} nameWide />
+
+            <details class="extra" open={errors.photos || errors.mileage || values.message || values.mileage ? true : undefined}>
+              <summary>+ Add photos or more details (optional)</summary>
+              <div class="fields">
+                <Photos state={state} />
+                <Mileage state={state} />
+                <Message state={state} />
+              </div>
+            </details>
+
+            <div class="end">
+              <button class="go send" type="submit">Get my free valuation</button>
+              <p class="small">{copy.trust}{privacy && <> · <a href={privacy}>Privacy policy</a></>}</p>
+              <div class="wa-row"><WhatsAppLine /></div>
+            </div>
+          </form>
+        )}
+      </div>
+
+      <section class="next" aria-labelledby="next-h">
+        <h2 class="sr" id="next-h">What happens next</h2>
+        <ol>
+          {copy.steps.map((s, i) => (
+            <li>
+              <span class="n" aria-hidden="true">{i + 1}</span>
+              <span><strong>{s.title}</strong><span class="muted">{s.text}</span></span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </div>
+  </main>
+</Base>
+
+<script>
+  // Looks the registration up as soon as it's typed, and shows the car or asks
+  // for it. The form itself is a normal POST; the lookup and the checks are in
+  // scripts/sell-form.ts.
+  import { sellForm } from "../../scripts/sell-form.ts";
+
+  const form = document.querySelector<HTMLFormElement>(".page-b .sell-form");
+  if (form) {
+    const { $, field, out, place, tidy, say, note, lookUp, fill, forget, facts, why, check, toFirstProblem, sending, canLookUp } = sellForm(form);
+    const plate = field("reg");
+    const found = $("[data-found]");
+    const busy = out("busy");
+    const switchBtn = $<HTMLButtonElement>('[data-act="switch"]');
+
+    // reg: the registration is enough. found: it's the car shown. asked: the
+    // car's fields show.
+    type State = "reg" | "found" | "asked";
+    const at = () => form.dataset.car as State;
+    const set = (s: State, text = "") => {
+      form.dataset.car = s;
+      found.hidden = s !== "found";
+      note(text);
+      switchBtn.textContent =
+        s === "asked" ? "Use a UK registration instead" : s === "found" ? "Not your car? Tell us the make and model" : "Foreign plates or none? Tell us the make and model";
+      syncPlace();
+    };
+    const syncPlace = () => ($("[data-reg-field]").hidden = at() === "asked" && place("Not registered").checked);
+
+    let asked = 0;
+    /** The registration the car shown (or asked for) goes with. */
+    let looked = "";
+    /** The lookup under way, so that sending can wait for it. */
+    let pending: Promise<void> | null = null;
+    const stop = () => {
+      asked++;
+      looked = "";
+      pending = null;
+      busy.hidden = true;
+      forget();
+    };
+    const find = () => {
+      const reg = tidy(plate.value);
+      if (pending && reg === looked) return pending;
+      stop();
+      plate.value = reg;
+      if (!reg) {
+        set("reg");
+        return Promise.resolve();
+      }
+      const mine = asked;
+      looked = reg;
+      busy.textContent = "Finding your car…";
+      busy.hidden = false;
+      const run = (async () => {
+        const r = await lookUp(reg);
+        if (mine !== asked) return;
+        pending = null;
+        busy.hidden = true;
+        if (r.kind === "found") {
+          fill(r.vehicle, r.summary);
+          if (!r.vehicle.make || !r.vehicle.model) return set("asked", why(reg, r));
+          out("title").textContent = `${r.vehicle.make} ${r.vehicle.model}`;
+          out("facts").textContent = facts(r.vehicle);
+          return set("found");
+        }
+        place(r.kind === "unknown" ? "Europe" : "UK").checked = true;
+        set("asked", why(reg, r));
+      })();
+      pending = run;
+      return run;
+    };
+
+    // Only a UK registration can be looked up: a seller who has said it's
+    // elsewhere is left alone (not one whose registration wasn't found, who
+    // may be correcting it).
+    let elsewhere = false;
+    const canFind = () => canLookUp && !elsewhere;
+    plate.addEventListener("input", () => {
+      say("reg");
+      // Another registration: the car shown isn't it.
+      if (at() === "found" && tidy(plate.value) !== looked) {
+        stop();
+        set("reg");
+      }
+    });
+    plate.addEventListener("change", () => {
+      if (canFind() && tidy(plate.value) !== looked) find();
+    });
+    switchBtn.addEventListener("click", () => {
+      say("reg");
+      stop();
+      if (at() === "asked") {
+        place("UK").checked = true;
+        elsewhere = false;
+        for (const id of ["make", "model", "year"]) say(id);
+        set("reg");
+        plate.focus();
+        if (plate.value) find();
+      } else {
+        elsewhere = at() !== "found";
+        place(elsewhere ? "Europe" : "UK").checked = true;
+        // The registration stays with the car that's typed in: not looked up again.
+        looked = tidy(plate.value);
+        set("asked");
+        (form.querySelector("input[name=registered]:checked") as HTMLElement).focus();
+      }
+    });
+    form.querySelectorAll('input[name="registered"]').forEach((r) =>
+      r.addEventListener("change", () => {
+        elsewhere = !place("UK").checked;
+        syncPlace();
+      }),
+    );
+
+    form.addEventListener("submit", async (e) => {
+      // Enter in the registration box looks it up and moves on.
+      const enter = document.activeElement === plate;
+      const needsLookup = canFind() && (at() === "reg" || pending !== null);
+      if (needsLookup) {
+        e.preventDefault();
+        if (!plate.value.trim()) {
+          check();
+          say("reg", "Enter your registration, or choose the link below.");
+          return plate.focus();
+        }
+        await find();
+        if (at() === "found") {
+          if (enter) field("name").focus();
+          else form.requestSubmit();
+        } else if (at() === "asked") field("make").value ? field("model").focus() : field("make").focus();
+        return;
+      }
+      if (enter && at() === "found" && !field("name").value.trim()) {
+        e.preventDefault();
+        field("name").focus();
+      } else if (check()) sending();
+      else e.preventDefault();
+    });
+
+    if (form.querySelector(".alert")) {
+      elsewhere = !place("UK").checked;
+      toFirstProblem();
+    }
+    syncPlace();
+  }
+</script>
+
+<style>
+  .page-b {
+    padding-block: 16px 8px;
+  }
+  .compare {
+    margin: 0 0 16px;
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+  .compare a {
+    color: inherit;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 520px;
+    grid-template-areas: "intro card" "next card";
+    grid-template-rows: auto 1fr;
+    gap: 36px 72px;
+    align-items: start;
+    padding-top: 20px;
+  }
+  .intro {
+    grid-area: intro;
+  }
+  .card {
+    grid-area: card;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 32px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+  }
+  .next {
+    grid-area: next;
+  }
+  h1,
+  .h1 {
+    font: 700 clamp(42px, 5vw, 60px)/1 var(--font-display);
+    margin: 0;
+  }
+  .sub {
+    max-width: 480px;
+    margin: 14px 0 0;
+    font-size: clamp(17px, 1.6vw, 19px);
+    color: var(--color-muted);
+  }
+  ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-line);
+  }
+  li {
+    display: flex;
+    gap: 20px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  li strong,
+  .muted {
+    display: block;
+  }
+  .muted {
+    color: var(--color-muted);
+  }
+  .n {
+    flex: none;
+    width: 16px;
+    font: 700 30px/1 var(--font-display);
+    color: var(--color-accent);
+  }
+  .next .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  form,
+  .fields {
+    display: grid;
+    gap: 18px;
+  }
+  form > :global(*),
+  .fields > :global(*) {
+    min-width: 0;
+  }
+  form h2 {
+    font: 700 28px/1.1 var(--font-display);
+    margin: 0;
+  }
+  .car .link {
+    margin-top: 6px;
+    font-size: 15px;
+    font-weight: 400;
+  }
+  .car .found,
+  .car .note,
+  .car .hint {
+    margin-top: 8px;
+  }
+  :global(html.js) form:not([data-car="asked"]) .car-fields {
+    display: none;
+  }
+  .extra[open] {
+    padding-top: 4px;
+  }
+  .end {
+    display: grid;
+    gap: 10px;
+  }
+  .wa-row {
+    text-align: center;
+  }
+  .small {
+    text-align: center;
+  }
+
+  @media (max-width: 980px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "intro" "card" "next";
+      grid-template-rows: none;
+      gap: 24px;
+      padding-top: 8px;
+    }
+  }
+  @media (max-width: 560px) {
+    .card {
+      padding: 22px 18px;
+    }
+    /* Clear of the floating WhatsApp button. */
+    li {
+      padding-right: 72px;
+    }
+  }
+</style>
