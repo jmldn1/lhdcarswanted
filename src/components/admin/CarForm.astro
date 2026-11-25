@@ -11,6 +11,7 @@ import type { Car } from "../../lib/cars.ts";
 import type { CarErrors } from "../../lib/car-form.ts";
 import { pick } from "../../lib/photos.ts";
 import { aiReady } from "../../lib/ai.ts";
+import { FLAGS } from "../../lib/flags.ts";
 
 interface Props {
   car: Car;
@@ -122,7 +123,8 @@ const described = car.photos.filter((p) => p.alt).length;
           </div>
           <div>
             <label class="a-lbl" for="f-reg">Registered in <span class="a-opt">(optional)</span></label>
-            <input class="a-in" id="f-reg" name="registered" value={car.registered} placeholder="UK, Germany, not registered…" />
+            <input class="a-in" id="f-reg" name="registered" value={car.registered} list="reg-countries" autocomplete="off" placeholder="UK, Germany, not registered…" />
+            <datalist id="reg-countries">{["UK", ...FLAGS.slice(1).map((f) => f.name), "Not registered"].map((n) => <option value={n} />)}</datalist>
           </div>
           <div>
             <label class="a-lbl" for="f-gear">Gearbox <span class="a-opt">(optional)</span></label>

@@ -9,6 +9,7 @@
 import Base from "../../layouts/Base.astro";
 import CarPhoto from "../../components/CarPhoto.astro";
 import CarCard from "../../components/CarCard.astro";
+import Flag from "../../components/Flag.astro";
 import CarDescription from "../../components/CarDescription.astro";
 import { brand } from "../../brands/index.ts";
 import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../../lib/cars.ts";
@@ -132,7 +133,7 @@ const enquire = `mailto:${brand.contact.email}?subject=${encodeURIComponent(`${n
         {facts.length > 0 && (
           <dl class="facts">
             {facts.map(([k, v]) => (
-              <div><dt>{k}</dt><dd>{v}</dd></div>
+              <div><dt>{k}</dt><dd>{k === "Registered" && <Flag registered={car.registered} />}{v}</dd></div>
             ))}
           </dl>
         )}

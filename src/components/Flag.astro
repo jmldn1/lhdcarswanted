@@ -1,0 +1,25 @@
+---
+// The small flag beside "Registered" on a car's page; nothing if the words
+// aren't clearly one country. The country is named beside it.
+import { flagFor } from "../lib/flags.ts";
+
+interface Props {
+  registered?: string;
+}
+const flag = flagFor(Astro.props.registered);
+---
+
+{flag && <svg class="flag" viewBox={flag.viewBox} preserveAspectRatio={flag.fit} aria-hidden="true" set:html={flag.svg} />}
+
+<style>
+  .flag {
+    display: inline-block;
+    width: 20px;
+    height: 15px;
+    margin-right: 8px;
+    vertical-align: -2px;
+    border-radius: 2px;
+    /* An edge, for flags with white in them. */
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-fg) 18%, transparent);
+  }
+</style>
