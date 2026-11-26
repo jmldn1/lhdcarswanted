@@ -19,7 +19,7 @@ import CarPhoto from "../components/CarPhoto.astro";
 import CarCard from "../components/CarCard.astro";
 import { brand } from "../brands/index.ts";
 import { listCars, makeSlug } from "../lib/cars.ts";
-import { getLanding, factorList, landingName } from "../lib/landings.ts";
+import { getLanding, factorList, landingName, landingPhoto, landingStock } from "../lib/landings.ts";
 import { lookupReady } from "../lib/vehicle-lookup.ts";
 import { readSellForm, saveSellRequest, DIAL_CODES, type SellRequest, type SellErrors } from "../lib/leads.ts";
 import { emailSellRequest } from "../lib/mail.ts";
@@ -61,10 +61,9 @@ const err = (k: keyof SellRequest) => errors[k];
 const flow = lookupReady() && !sent && !failed && !Object.keys(errors).length;
 
 // That make's cars in stock: the hero's photo if none was uploaded, and two cards.
-const stock = (await listCars()).filter((c) => makeSlug(c.make) === makeSlug(landing.make) && c.status !== "sold");
-const sameModel = stock.find((c) => c.photos.length && c.model.toLowerCase().includes(landing.model.toLowerCase()));
-const hero = landing.photo ?? (sameModel ?? stock.find((c) => c.photos.length))?.photos[0];
-const cards = stock.slice(0, 2);
+const allCars = await listCars();
+const hero = landingPhoto(landing, allCars)?.photo;
+const cards = landingStock(landing, allCars).slice(0, 2);
 
 const factors = factorList(landing.factors);
 const paras = (t: string) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);

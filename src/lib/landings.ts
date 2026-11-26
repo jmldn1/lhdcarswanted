@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import type { Photo } from "./photos.ts";
 import { processPhoto, photoStore } from "./photos.ts";
 import { deletePhotoFiles, deleteCarFiles, MAX_UPLOAD_BYTES } from "./photo-queue.ts";
-import { makeSlug } from "./cars.ts";
+import { makeSlug, type Car } from "./cars.ts";
 import { db, hasDb } from "./db.ts";
 
 export interface Landing {
@@ -38,6 +38,17 @@ const NO_ID = { projection: { _id: 0 } } as const;
 
 export const landingName = (l: Pick<Landing, "make" | "model">) => `${l.make} ${l.model}`;
 export const landingSlug = (make: string, model: string) => `sell-your-${makeSlug(`${make} ${model}`)}`;
+
+/** That make's unsold cars, for the page's cards and its photo. */
+export const landingStock = (l: Pick<Landing, "make">, cars: Car[]) => cars.filter((c) => makeSlug(c.make) === makeSlug(l.make) && c.status !== "sold");
+
+/** The page's photo: the one uploaded, or else a car of that model, or of that make, from stock. */
+export function landingPhoto(l: Pick<Landing, "make" | "model" | "photo">, cars: Car[]): { photo: Photo; fromStock: boolean } | undefined {
+  if (l.photo) return { photo: l.photo, fromStock: false };
+  const stock = landingStock(l, cars);
+  const car = stock.find((c) => c.photos.length && c.model.toLowerCase().includes(l.model.toLowerCase())) ?? stock.find((c) => c.photos.length);
+  return car && { photo: car.photos[0], fromStock: true };
+}
 
 /** A published page, by its address. */
 export async function getLanding(slug: string): Promise<Landing | undefined> {

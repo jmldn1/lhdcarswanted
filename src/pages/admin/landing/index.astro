@@ -2,10 +2,13 @@
 // Admin: landing pages ("Sell your Porsche 911"), drafts included.
 import Admin from "../../../layouts/Admin.astro";
 import { hasDb } from "../../../lib/db.ts";
-import { listLandings, landingName } from "../../../lib/landings.ts";
+import { listLandings, landingName, landingPhoto } from "../../../lib/landings.ts";
+import { listCars } from "../../../lib/cars.ts";
+import { pick } from "../../../lib/photos.ts";
 
 const ready = hasDb();
 const pages = ready ? await listLandings() : [];
+const cars = pages.length ? await listCars() : [];
 const deleted = Astro.url.searchParams.get("deleted") === "1";
 ---
 
@@ -28,9 +31,17 @@ const deleted = Astro.url.searchParams.get("deleted") === "1";
 
     {ready && (pages.length ? (
       <ul class="list">
-        {pages.map((l) => (
+        {pages.map((l) => {
+          const hero = landingPhoto(l, cars);
+          return (
           <li>
             <a class="row" href={`/admin/landing/${l.id}`}>
+              {hero ? (
+                <span class="pic">
+                  <img src={pick(hero.photo.avif, 300).url} alt="" width="120" height="68" loading="lazy" />
+                  {hero.fromStock && <span class="stock">From stock</span>}
+                </span>
+              ) : <span class="nophoto">No photo</span>}
               <span class="name">
                 <strong>Sell your {landingName(l)}</strong>
                 <span class="muted">/{l.slug}</span>
@@ -38,7 +49,8 @@ const deleted = Astro.url.searchParams.get("deleted") === "1";
               <span><span class={`a-chip ${l.status === "published" ? "available" : "draft"}`}>{l.status === "published" ? "Published" : "Draft"}</span></span>
             </a>
           </li>
-        ))}
+          );
+        })}
       </ul>
     ) : (
       <p class="empty">No landing pages yet. Add the first, for example Porsche 911.</p>
@@ -73,17 +85,46 @@ const deleted = Astro.url.searchParams.get("deleted") === "1";
   .list li + li {
     border-top: 1px solid var(--color-line);
   }
+  /* As the blog's list: photo, name, status. */
   .row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: 16px;
-    padding: 14px 18px;
+    padding: 10px 14px;
     color: inherit;
     text-decoration: none;
   }
   .row:hover {
     background: var(--color-bg);
+  }
+  .pic {
+    position: relative;
+    display: block;
+  }
+  .pic img,
+  .nophoto {
+    display: block;
+    width: 120px;
+    height: 68px;
+    object-fit: cover;
+    background: var(--color-line);
+  }
+  .nophoto {
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+  /* The page has no photo of its own, so it borrows a car's. */
+  .stock {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    padding: 1px 6px;
+    font-size: 11px;
+    color: #fff;
+    background: rgb(0 0 0 / 0.7);
   }
   .name {
     display: flex;
@@ -91,6 +132,20 @@ const deleted = Astro.url.searchParams.get("deleted") === "1";
     gap: 2px;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  @media (max-width: 639px) {
+    .row {
+      grid-template-columns: 96px minmax(0, 1fr);
+    }
+    .pic,
+    .nophoto {
+      grid-row: span 2;
+    }
+    .pic img,
+    .nophoto {
+      width: 96px;
+      height: 54px;
+    }
   }
   .muted {
     color: var(--color-muted);
