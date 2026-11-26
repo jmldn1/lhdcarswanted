@@ -54,7 +54,7 @@ const sales = brand.contact.phones[0];
         </a>
         <!-- Shown only on phones with scripts running (CSS below). -->
         <button class="menu-btn" type="button" aria-expanded="false" aria-controls="main-nav">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="bars" d="M4 7h16M4 12h16M4 17h16" /><path class="cross" d="M6 6l12 12M18 6L6 18" /></svg>
           Menu
         </button>
         <nav id="main-nav" aria-label="Main">
@@ -82,9 +82,16 @@ const sales = brand.contact.phones[0];
   // Phones: the Menu button opens and closes the links.
   const btn = document.querySelector<HTMLButtonElement>(".menu-btn");
   const nav = document.getElementById("main-nav");
-  btn?.addEventListener("click", () => {
-    const open = nav?.classList.toggle("open") ?? false;
-    btn.setAttribute("aria-expanded", String(open));
+  const show = (open: boolean) => {
+    nav?.classList.toggle("open", open);
+    btn?.setAttribute("aria-expanded", String(open));
+  };
+  btn?.addEventListener("click", () => show(!nav?.classList.contains("open")));
+  // Escape closes it, back on the button.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !nav?.classList.contains("open")) return;
+    show(false);
+    btn?.focus();
   });
 </script>
 
@@ -147,6 +154,14 @@ const sales = brand.contact.phones[0];
     stroke-width: 2;
     stroke-linecap: round;
   }
+  /* ☰ when closed, × when open. */
+  .menu-btn .cross,
+  .menu-btn[aria-expanded="true"] .bars {
+    display: none;
+  }
+  .menu-btn[aria-expanded="true"] .cross {
+    display: inline;
+  }
   /* Phones (with scripts): the links behind a Menu button, opening as a list
      under the bar. Without scripts they simply wrap. */
   @media (max-width: 899px) {
@@ -155,6 +170,13 @@ const sales = brand.contact.phones[0];
     }
     :global(.js) .bar {
       flex-wrap: wrap;
+      row-gap: 0;
+    }
+    /* The top row keeps its height when the links open below it, so the
+       logo and button don't move. */
+    :global(.js) .logo {
+      min-height: 64px;
+      align-content: center;
     }
     :global(.js) nav {
       display: none;
@@ -162,7 +184,7 @@ const sales = brand.contact.phones[0];
       flex-direction: column;
       align-items: stretch;
       gap: 0;
-      padding-bottom: 8px;
+      border-top: 1px solid var(--color-line);
     }
     :global(.js) nav.open {
       display: flex;
@@ -170,6 +192,10 @@ const sales = brand.contact.phones[0];
     :global(.js) nav a {
       padding-block: 12px;
       border-bottom: 1px solid var(--color-line);
+    }
+    /* The header's own line closes the list. */
+    :global(.js) nav a:last-child {
+      border-bottom: 0;
     }
     :global(.js) nav a[aria-current="page"] {
       border-bottom-color: var(--color-line);
