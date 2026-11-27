@@ -20,8 +20,8 @@ import { brand } from "../../../brands/index.ts";
 import { getCar, listCars, specsLine, priceLabel, makeSlug, carFacts } from "../../../lib/cars.ts";
 import { lightboxJson } from "../../../lib/lightbox.ts";
 import { pageVideo } from "../../../lib/video.ts";
-import { readEnquiryForm, saveEnquiry, DIAL_CODES, type Enquiry, type EnquiryErrors } from "../../../lib/leads.ts";
-import { emailEnquiry } from "../../../lib/mail.ts";
+import EnquiryForm from "../../../components/EnquiryForm.astro";
+import { enquiryForm } from "../../../lib/enquiry-page.ts";
 
 const layout = Astro.params.layout;
 if (layout !== "b" && layout !== "c") return new Response(null, { status: 404 });
@@ -33,30 +33,10 @@ const here = `/cars/${car.slug}/${layout}`;
 /** Layout C: thumbnails under the photo on phones. */
 const phoneThumbs = layout === "c";
 
-let values: Partial<Enquiry> = { dial: "+44", message: `I'm interested in the ${name}.` };
-let errors: EnquiryErrors = {};
-let failed = false;
-
-if (Astro.request.method === "POST") {
-  const form = await Astro.request.formData();
-  // Left empty by people; filled by bots. Bots get the thank-you anyway.
-  if (String(form.get("website") ?? "")) return Astro.redirect(`${here}?sent=1#enquire`, 303);
-  const read = readEnquiryForm(form);
-  values = read.data;
-  errors = read.errors;
-  if (!Object.keys(errors).length) {
-    try {
-      const about = { id: car.id, name, url: `/cars/${car.slug}` };
-      await saveEnquiry(read.data, about);
-      emailEnquiry(read.data, about);
-      return Astro.redirect(`${here}?sent=1#enquire`, 303);
-    } catch {
-      failed = true;
-    }
-  }
-  Astro.response.status = 400;
-}
-const sent = Astro.url.searchParams.get("sent") === "1";
+// The enquiry form: saved, emailed, then the thank-you (src/lib/enquiry-page.ts).
+const enq = await enquiryForm(Astro.request, Astro.url, car, here);
+if (enq.redirect) return Astro.redirect(enq.redirect, 303);
+if (enq.status) Astro.response.status = enq.status;
 
 const facts = carFacts(car);
 const others = (await listCars()).filter((c) => c.id !== car.id && c.status !== "sold").slice(0, 2);
@@ -74,7 +54,6 @@ const n = car.photos.length;
 const mosaic = n >= (video ? 4 : 5);
 const shown = car.photos.slice(0, mosaic ? (video ? 4 : 5) : 1);
 
-const err = (k: keyof Enquiry) => errors[k];
 ---
 
 <Base title={name} description={specsLine(car)} noindex car={name}>
@@ -199,50 +178,7 @@ const err = (k: keyof Enquiry) => errors[k];
         {car.description && <CarDescription text={car.description} />}
       </section>
 
-      <section id="enquire" class="enquire" aria-labelledby="enq-h">
-        {sent ? (
-          <div class="thanks" role="status">
-            <h2 id="enq-h">Thank you</h2>
-            <p>Your enquiry about the {name} has been sent.</p>
-          </div>
-        ) : (
-          <form method="post" action={`${here}#enquire`} novalidate>
-            <h2 id="enq-h">Ask about this car</h2>
-            {failed && <p class="fail" role="alert">Sorry, that didn't send. Please try again, or call us.</p>}
-            <div class="field">
-              <label for="e-name">Name</label>
-              <input id="e-name" name="name" autocomplete="name" value={values.name} aria-invalid={err("name") ? "true" : undefined} aria-describedby={err("name") ? "e-name-err" : undefined} />
-              {err("name") && <p class="err" id="e-name-err">{err("name")}</p>}
-            </div>
-            <div class="field">
-              <label for="e-email">Email</label>
-              <input id="e-email" name="email" type="email" autocomplete="email" value={values.email} aria-invalid={err("email") ? "true" : undefined} aria-describedby={err("email") ? "e-email-err" : undefined} />
-              {err("email") && <p class="err" id="e-email-err">{err("email")}</p>}
-            </div>
-            <div class="field">
-              <label for="e-phone">Phone <span class="opt">(optional)</span></label>
-              <div class="tel">
-                <select name="dial" class="dial" aria-label="Country code">
-                  {DIAL_CODES.map(([code]) => <option value={code} selected={values.dial === code}>{code}</option>)}
-                </select>
-                <input id="e-phone" name="phone" type="tel" autocomplete="tel-national" value={values.phone} aria-invalid={err("phone") ? "true" : undefined} aria-describedby={err("phone") ? "e-phone-err" : undefined} />
-              </div>
-              {err("phone") && <p class="err" id="e-phone-err">{err("phone")}</p>}
-            </div>
-            <div class="field">
-              <label for="e-msg">Message</label>
-              <textarea id="e-msg" name="message" rows="4" aria-invalid={err("message") ? "true" : undefined} aria-describedby={err("message") ? "e-msg-err" : undefined}>{values.message}</textarea>
-              {err("message") && <p class="err" id="e-msg-err">{err("message")}</p>}
-            </div>
-            <div class="hp" aria-hidden="true">
-              <label for="e-website">Leave this empty</label>
-              <input id="e-website" name="website" tabindex="-1" autocomplete="off" />
-            </div>
-            <button class="btn btn-dark big send" type="submit">Send enquiry</button>
-            {sales && <p class="or">Or call us on <a href={`tel:${sales.tel}`}>{sales.display}</a>.</p>}
-          </form>
-        )}
-      </section>
+      <EnquiryForm here={here} car={name} state={enq} />
     </div>
   </main>
 
@@ -768,111 +704,12 @@ const err = (k: keyof Enquiry) => errors[k];
     }
   }
   .about h2,
-  .enquire h2,
   .more h2 {
     font: 700 30px/1.1 var(--font-display);
     margin: 0 0 14px;
   }
   .about {
     font-size: 18px;
-  }
-
-  /* The enquiry form, in the sell page's plain style. */
-  .enquire {
-    background: var(--color-surface);
-    border: 1px solid var(--color-line);
-    padding: 28px;
-    scroll-margin-top: 16px;
-  }
-  @media (max-width: 639px) {
-    .enquire {
-      padding: 22px 18px;
-    }
-  }
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  form h2 {
-    margin-bottom: 0 !important;
-  }
-  .field label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 600;
-    font-size: 15px;
-  }
-  .opt {
-    font-weight: 400;
-    color: var(--color-muted);
-  }
-  .field input,
-  .field textarea,
-  .dial {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 50px;
-    padding: 0 14px;
-    border: 1px solid var(--color-muted);
-    background: var(--color-surface);
-    color: var(--color-fg);
-    font: 400 16px/1.4 var(--font-body);
-  }
-  .field textarea {
-    padding: 12px 14px;
-    resize: vertical;
-  }
-  .field input:focus,
-  .field textarea:focus,
-  .dial:focus {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
-  }
-  [aria-invalid="true"] {
-    border-color: #b42318 !important;
-  }
-  .err,
-  .fail {
-    margin: 6px 0 0;
-    color: #b42318;
-    font-size: 15px;
-    font-weight: 600;
-  }
-  .tel {
-    display: flex;
-  }
-  .dial {
-    flex: 0 0 76px;
-    width: 76px;
-    padding: 0 20px 0 12px;
-    border-right: 0;
-    background: var(--color-bg)
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%235d6470'%3E%3Cpath d='M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4z'/%3E%3C/svg%3E")
-      no-repeat right 4px center / 16px;
-    appearance: none;
-    font-weight: 600;
-  }
-  .hp {
-    position: absolute;
-    left: -9999px;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-  }
-  .send {
-    width: 100%;
-    min-height: 54px;
-    font-size: 16px;
-  }
-  .or {
-    margin: 0;
-    font-size: 14px;
-    color: var(--color-muted);
-  }
-  .thanks p {
-    margin: 0;
   }
 
   /* The sell band, as on the homepage. */
