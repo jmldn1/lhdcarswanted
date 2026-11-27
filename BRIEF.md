@@ -109,6 +109,14 @@ site. Started 18 November 2026.
    (who, story, numbers, what you sell), real Google reviews, reply time,
    address and opening hours (then a map), and the blog's first posts.
    Not built yet: photos inside a post (only a cover), the privacy page.
+   *Google reviews, built 26 Nov 2026* as on v1 (src/lib/google-reviews.ts,
+   Admin, Reviews): the profile owner connects once, the rating and newest
+   reviews are fetched at most daily, and About shows the rating and the
+   three newest with words in place of the placeholders. **Needs:**
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (v1's OAuth client can be
+   used, with this site's /admin/google/callback added to its redirect
+   URIs), then Connect; and `contact.googleProfileUrl` for "Read them on
+   Google". The privacy page must say reviews are fetched from Google.
 5. ~~Sell your car form~~ Built 18 Nov 2026 at /sell-your-car from the mockup
    (https://claude.ai/artifact/Uni1eTfYZGwYM2N36RqUNv); since 25 Nov 2026 in
    layout A, for now (https://claude.ai/artifact/74q48axCbeYVZZ1URB8Dm6):

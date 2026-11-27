@@ -37,14 +37,15 @@ export interface AboutCopy {
   heading: string;
   intro: string;
   /** Up to three numbers, e.g. { value: "15", label: "years buying LHD cars" }. */
-  stats: { value: string; label: string }[];
+  /** google: filled with the live Google rating and count once Admin, Reviews has fetched them. */
+  stats: { value: string; label: string; google?: boolean }[];
   /** "We buy left hand drive cars" text. */
   buy: string;
   /** "We sell left hand drive cars" text. */
   sell: string;
   /** Paragraphs of "Our story". */
   story: string[];
-  /** Real reviews only. */
+  /** Real reviews only; replaced by the newest Google reviews once Admin, Reviews has fetched them. */
   reviews: { text: string; name: string }[];
 }
 

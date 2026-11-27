@@ -1,0 +1,262 @@
+---
+// Admin, Reviews: connect the Google Business Profile once, pick the profile
+// if the account manages several, fetch now, or disconnect. The calls to
+// Google and the daily fetch: src/lib/google-reviews.ts.
+import Admin from "../../../layouts/Admin.astro";
+import { hasDb } from "../../../lib/db.ts";
+import { googleReady, googleState, chooseLocation, refreshReviews, refreshIfStale, disconnect, redirectUri } from "../../../lib/google-reviews.ts";
+
+const ready = hasDb();
+
+if (ready && Astro.request.method === "POST") {
+  const form = await Astro.request.formData();
+  const what = String(form.get("do") ?? "");
+  if (what === "location") {
+    if (await chooseLocation(Number(form.get("location")))) await refreshReviews();
+    return Astro.redirect("/admin/google?done=connected", 303);
+  }
+  if (what === "refresh") {
+    const doc = await refreshReviews();
+    return Astro.redirect(doc?.lastError ? `/admin/google?error=${encodeURIComponent(doc.lastError)}` : "/admin/google?done=fetched", 303);
+  }
+  if (what === "disconnect") {
+    await disconnect();
+    return Astro.redirect("/admin/google?done=disconnected", 303);
+  }
+}
+
+const doc = ready ? await googleState() : null;
+refreshIfStale(doc);
+const configured = googleReady();
+const connected = Boolean(doc?.refreshToken);
+const choosing = connected && !doc?.locationName && (doc?.locations?.length ?? 0) > 0;
+
+const MESSAGES: Record<string, { ok: boolean; text: string }> = {
+  connected: { ok: true, text: 'Connected. The reviews are fetched once a day; "Fetch now" updates them straight away.' },
+  choose: { ok: true, text: "Connected. Choose which profile is this business." },
+  fetched: { ok: true, text: "Reviews updated." },
+  disconnected: { ok: true, text: "Disconnected. The About page goes back to the reviews in the brand file." },
+  denied: { ok: false, text: "Google sign-in was cancelled, so nothing was connected." },
+  state: { ok: false, text: 'That sign-in had expired or came from somewhere else. Try "Connect" again.' },
+  "no-location": { ok: false, text: "That Google account doesn't manage any Business Profiles. Sign in with the profile's owner or a manager." },
+};
+const q = Astro.url.searchParams;
+const message = MESSAGES[q.get("done") ?? ""] ?? (q.get("error") ? { ok: false, text: q.get("error")!.slice(0, 400) } : null);
+
+const day = (d?: Date | null) => (d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" }) : "");
+const time = (d?: Date | null) => (d ? d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }) : "");
+const stars = (n?: number | null) => "★★★★★".slice(0, n ?? 0) + "☆☆☆☆☆".slice(0, 5 - (n ?? 0));
+---
+
+<Admin title="Reviews" active="google">
+  <div class="page">
+    <div>
+      <h1 class="admin-h1">Google reviews</h1>
+      <p class="a-hint">The rating and newest reviews from this business's Google Business Profile, fetched once a day, for the About page.</p>
+    </div>
+
+    {message && <p class:list={["msg", { bad: !message.ok }]} role={message.ok ? "status" : "alert"}>{message.text}</p>}
+
+    {!ready ? (
+      <p class="a-note">The database isn't set up yet: add <code>MONGODB_URI</code> to <code>.env</code>, then restart the site.</p>
+    ) : !configured ? (
+      <section class="admin-box">
+        <h2>Not set up yet</h2>
+        <p>The server needs <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> in its <code>.env</code> (from a Google Cloud OAuth client of type "Web application"), then a restart.</p>
+        <p>London LHD Centre's client can be used: add this address to its "Authorised redirect URIs" in Google Cloud:</p>
+        <code class="uri">{redirectUri(Astro.request)}</code>
+      </section>
+    ) : !connected ? (
+      <section class="admin-box">
+        <h2>Connect the Business Profile</h2>
+        <p>Sign in with the Google account that <strong>owns or manages</strong> this business's Google Business Profile, and click "Allow". It's done once; the site then fetches the reviews by itself every day.</p>
+        <p><a class="a-btn pri" href="/admin/google/connect">Connect Google Business Profile</a></p>
+        <details>
+          <summary>If Google shows an error</summary>
+          <ul>
+            <li><strong>redirect_uri_mismatch:</strong> add this exact address to the OAuth client's "Authorised redirect URIs" in Google Cloud: <code class="uri">{redirectUri(Astro.request)}</code></li>
+            <li><strong>Access blocked, or not a test user:</strong> add the signing-in account as a test user on the OAuth consent screen, or set the app to "In production".</li>
+            <li><strong>Quota, or not approved:</strong> Google hasn't approved the Cloud project for the Business Profile API yet. Connecting works once it has.</li>
+          </ul>
+        </details>
+      </section>
+    ) : choosing ? (
+      <section class="admin-box">
+        <h2>Choose the profile</h2>
+        <p>This Google account manages more than one Business Profile. Which one is this business?</p>
+        <form method="post" class="locs">
+          <input type="hidden" name="do" value="location" />
+          {doc!.locations!.map((loc, i) => (
+            <label class="loc">
+              <input type="radio" name="location" value={i} checked={i === 0} />
+              <span><strong>{loc.title || loc.location}</strong>{loc.address && <><br /><span class="muted">{loc.address}</span></>}</span>
+            </label>
+          ))}
+          <p><button class="a-btn pri" type="submit">Use this profile</button></p>
+        </form>
+      </section>
+    ) : (
+      <>
+        <section class="admin-box">
+          <div class="top">
+            <div>
+              <h2>{doc!.locationTitle || "Business Profile"}</h2>
+              <p class="muted">
+                Connected {day(doc!.connectedAt)}. {doc!.lastFetchAt ? `Last updated ${time(doc!.lastFetchAt)}.` : "Not fetched yet."}
+              </p>
+            </div>
+            <div class="acts">
+              <form method="post"><input type="hidden" name="do" value="refresh" /><button class="a-btn" type="submit">Fetch now</button></form>
+              <form method="post"><input type="hidden" name="do" value="disconnect" /><button class="a-btn danger" type="submit">Disconnect</button></form>
+            </div>
+          </div>
+          {doc!.lastError && (
+            <p class="msg bad"><strong>Last fetch failed ({time(doc!.lastErrorAt)}):</strong> {doc!.lastError}</p>
+          )}
+          {doc!.rating ? (
+            <p class="score">
+              <b>{doc!.rating.toFixed(1)}</b>
+              <span class="stars" aria-hidden="true">{stars(Math.round(doc!.rating))}</span>
+              <span class="muted">{(doc!.reviewCount ?? 0).toLocaleString("en-GB")} reviews</span>
+            </p>
+          ) : null}
+        </section>
+
+        {(doc!.reviews?.length ?? 0) > 0 && (
+          <section class="admin-box">
+            <h2>Recent reviews</h2>
+            <p class="a-hint">The About page shows the three newest with words, whatever their stars.</p>
+            <ul class="revs">
+              {doc!.reviews!.slice(0, 15).map((r) => (
+                <li>
+                  <p class="who">
+                    <span class="stars" role="img" aria-label={`${r.rating} stars`}>{stars(r.rating)}</span>
+                    <strong>{r.author}</strong>
+                    <span class="muted">{day(r.createdAt)}</span>
+                    <span class="a-chip draft">{r.reply ? "Replied" : "No reply yet"}</span>
+                  </p>
+                  {r.comment ? <p class="said">{r.comment}</p> : <p class="muted"><em>Stars only, no words</em></p>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </>
+    )}
+  </div>
+</Admin>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    max-width: 1000px;
+  }
+  .page p {
+    margin: 0;
+  }
+  .page .a-hint {
+    margin-top: 4px;
+  }
+  .msg {
+    padding: 12px 16px;
+    border: 1px solid var(--color-line);
+    background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  }
+  .msg.bad {
+    background: #fdecea;
+    border-color: #f3c4bd;
+    color: #8a1c10;
+  }
+  .uri {
+    display: block;
+    padding: 8px 10px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-line);
+    overflow-wrap: anywhere;
+  }
+  details {
+    font-size: 14px;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  details ul {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding-left: 20px;
+  }
+  .locs {
+    display: grid;
+    gap: 8px;
+  }
+  .loc {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px;
+    border: 1px solid var(--color-line);
+    cursor: pointer;
+  }
+  .loc input {
+    margin-top: 4px;
+  }
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .top h2 {
+    font: 700 24px/1.1 var(--font-display);
+    margin: 0 0 4px;
+  }
+  .acts {
+    display: flex;
+    gap: 8px;
+  }
+  .a-btn.danger {
+    border-color: #b42318;
+    color: #b42318;
+  }
+  .muted {
+    color: var(--color-muted);
+    font-size: 14px;
+  }
+  .score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .score b {
+    font: 700 40px/1 var(--font-display);
+  }
+  .stars {
+    color: #e0a100;
+    letter-spacing: 1px;
+  }
+  .revs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .revs li {
+    padding: 14px 0;
+    border-top: 1px solid var(--color-line);
+  }
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+  }
+  .said {
+    margin-top: 6px !important;
+    white-space: pre-line;
+  }
+</style>

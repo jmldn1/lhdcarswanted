@@ -81,7 +81,7 @@ export const lhdCarsWanted: Brand = {
       stats: [
         { value: "[Years]", label: "[years buying and selling LHD cars]" },
         { value: "[Number]", label: "[cars bought]" },
-        { value: "[Rating]", label: "[from Google reviews]" },
+        { value: "[Rating]", label: "[from Google reviews]", google: true },
       ],
       // The confirmed sell band wording.
       buy: "Free valuation and top cash prices paid. Outstanding finance settled, secure payment and free UK collection.",

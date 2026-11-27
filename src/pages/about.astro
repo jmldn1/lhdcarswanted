@@ -2,6 +2,8 @@
 // About, from the blog/about/contact mockups. Every word comes from the
 // brand (copy.about; the selling steps from copy.sell). Off when the brand
 // has no About copy. Photos: the featured car's, as on the homepage.
+// Reviews: the newest Google reviews and the live rating once Admin, Reviews
+// is connected (src/lib/google-reviews.ts), else the brand's.
 import Base from "../layouts/Base.astro";
 import CarPhoto from "../components/CarPhoto.astro";
 import SellBand from "../components/SellBand.astro";
@@ -9,6 +11,7 @@ import { brand } from "../brands/index.ts";
 import { listCars } from "../lib/cars.ts";
 import { getSitePhotos } from "../lib/site.ts";
 import { getPagePhotos, type PagePhoto } from "../lib/page-photos.ts";
+import { googleState, liveReviews, refreshIfStale } from "../lib/google-reviews.ts";
 
 const about = brand.copy.about;
 if (!about) return new Response(null, { status: 404 });
@@ -25,6 +28,16 @@ const carPhoto = (c: (typeof cars)[number] | undefined): PagePhoto | undefined =
   c && { photo: c.photos[0], alt: `${c.make} ${c.model}`, focus: "50% 50%" };
 const lead = pagePhotos.aboutMain ?? carPhoto(leadCar);
 const second = pagePhotos.aboutSecond ?? carPhoto(secondCar);
+
+// Google: what was last fetched (a fresh fetch starts in the background when
+// it's over a day old). The page never waits on, or fails because of, Google.
+const gdoc = await googleState().catch(() => null);
+refreshIfStale(gdoc);
+const live = liveReviews(gdoc, 3);
+const count = (n: number) => `${n.toLocaleString("en-GB")} Google ${n === 1 ? "review" : "reviews"}`;
+const stats = about.stats.map((s) => (s.google && live ? { value: live.rating.toFixed(1), label: `from ${count(live.reviewCount)}` } : s));
+const googleUrl = brand.contact.googleProfileUrl;
+const star = "M10 1.5l2.6 5.27 5.82.85-4.21 4.1 1 5.8L10 14.9l-5.21 2.62 1-5.8-4.21-4.1 5.82-.85z";
 ---
 
 <Base title="About us" description={about.intro} flush>
@@ -46,10 +59,10 @@ const second = pagePhotos.aboutSecond ?? carPhoto(secondCar);
       )}
     </section>
 
-    {about.stats.length > 0 && (
+    {stats.length > 0 && (
       <section class="wrap" aria-label="In numbers">
         <dl class="stats">
-          {about.stats.map((s) => <div><dt>{s.label}</dt><dd>{s.value}</dd></div>)}
+          {stats.map((s) => <div><dt>{s.label}</dt><dd>{s.value}</dd></div>)}
         </dl>
       </section>
     )}
@@ -99,7 +112,37 @@ const second = pagePhotos.aboutSecond ?? carPhoto(secondCar);
       </section>
     )}
 
-    {about.reviews.length > 0 && (
+    {live && live.quotes.length > 0 ? (
+      <section class="wrap" aria-labelledby="rev-h">
+        <div class="rev-head">
+          <h2 id="rev-h">What customers say</h2>
+          <p class="g-sum">
+            <span class="g-stars" role="img" aria-label={`Rated ${live.rating.toFixed(1)} out of 5`}>
+              {[1, 2, 3, 4, 5].map((i) => <svg viewBox="0 0 20 20" aria-hidden="true" class:list={{ dim: i > Math.round(live.rating) }}><path d={star} /></svg>)}
+            </span>
+            <b>{live.rating.toFixed(1)}</b> from {count(live.reviewCount)}
+            {googleUrl && <> · <a href={googleUrl} target="_blank" rel="noopener noreferrer">Read them on Google</a></>}
+          </p>
+        </div>
+        <div class="reviews">
+          {live.quotes.map((r) => (
+            <figure class="card g-card">
+              <span class="g-stars" role="img" aria-label={`${r.rating} out of 5 stars`}>
+                {Array.from({ length: r.rating }, () => <svg viewBox="0 0 20 20" aria-hidden="true"><path d={star} /></svg>)}
+              </span>
+              <blockquote><p>{r.comment}</p></blockquote>
+              <figcaption>
+                <span class="g-ini" aria-hidden="true">{r.initials}</span>
+                <span>
+                  <span class="g-name">{r.author}</span>
+                  <span class="g-when">Google review · {r.date}</span>
+                </span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+    ) : about.reviews.length > 0 && (
       <section class="wrap" aria-labelledby="rev-h">
         <h2 id="rev-h">What customers say</h2>
         <div class="reviews">
@@ -263,5 +306,86 @@ const second = pagePhotos.aboutSecond ?? carPhoto(secondCar);
   }
   figcaption {
     font-weight: 700;
+  }
+
+  /* Live Google reviews: the rating beside the heading, then the newest
+     reviews as written, cut to six lines (the rest is on Google). Initials
+     stand in for the reviewer's photo, which would load from Google. */
+  .rev-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 24px;
+    margin-bottom: 24px;
+  }
+  .rev-head h2 {
+    margin: 0;
+  }
+  .g-sum {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+    color: var(--color-muted);
+  }
+  .g-sum b {
+    color: var(--color-fg);
+  }
+  .g-sum a {
+    font-weight: 700;
+  }
+  .g-stars {
+    display: inline-flex;
+    gap: 2px;
+    color: #e0a100;
+  }
+  .g-stars svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+  .g-stars svg.dim {
+    color: var(--color-line);
+  }
+  .g-card blockquote {
+    flex: 1;
+  }
+  .g-card blockquote p {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    overflow: hidden;
+    white-space: pre-line;
+  }
+  .g-card figcaption {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .g-ini {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-line);
+    color: var(--color-fg);
+    font: 700 14px/1 var(--font-body);
+  }
+  .g-name {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .g-when {
+    display: block;
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--color-muted);
   }
 </style>
