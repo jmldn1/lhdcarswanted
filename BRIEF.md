@@ -106,7 +106,8 @@ site. Started 18 November 2026.
    the admin (Blog) and kept in the database; Contact messages go to the
    admin's Leads (Messages). The menu gains Blog, About and Contact, behind
    a Menu button on phones. **Waiting on the client:** the About words
-   (who, story, numbers, what you sell), real Google reviews, reply time,
+   (who, story, what you sell; the numbers *confirmed 27 Nov 2026:* 35
+   years, 1,000+ cars bought), real Google reviews, reply time,
    address and opening hours (then a map), and the blog's first posts.
    Not built yet: photos inside a post (only a cover), the privacy page.
    *Google reviews, built 26 Nov 2026* as on v1 (src/lib/google-reviews.ts,

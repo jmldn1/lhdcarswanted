@@ -79,8 +79,9 @@ export const lhdCarsWanted: Brand = {
       heading: "Left hand drive cars, bought and sold",
       intro: "[Who we are, in one or two sentences: who runs it, since when, where.]",
       stats: [
-        { value: "[Years]", label: "[years buying and selling LHD cars]" },
-        { value: "[Number]", label: "[cars bought]" },
+        // Confirmed 27 Nov 2026.
+        { value: "35", label: "years buying and selling LHD cars" },
+        { value: "1,000+", label: "cars bought" },
         { value: "[Rating]", label: "[from Google reviews]", google: true },
       ],
       // The confirmed sell band wording.
