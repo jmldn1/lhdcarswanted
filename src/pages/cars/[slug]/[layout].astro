@@ -701,10 +701,12 @@ const err = (k: keyof Enquiry) => errors[k];
     .price {
       align-items: flex-start;
     }
+    /* Stacked, full width, as on layout A: Call, then the video. */
     .buy-btns {
       display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: 1fr;
+    }
+    .buy-btns .watch {
+      order: 1;
     }
     .buy-btns .btn-dark {
       display: none;
