@@ -68,6 +68,7 @@ const err = (k: keyof Message) => errors[k];
           <div role="status">
             <h2 id="msg-h">Thank you</h2>
             <p class="m0">Your message has been sent.</p>
+            <p class="m0 again"><a href="/contact?again#message">Send another message</a></p>
           </div>
         ) : (
           <form method="post" action="/contact#message" novalidate>
@@ -213,6 +214,10 @@ const err = (k: keyof Message) => errors[k];
   }
   .m0 {
     margin: 0;
+  }
+  .m0.again {
+    margin-top: 12px;
+    font-weight: 700;
   }
   .addr {
     font-size: 17px;

@@ -29,6 +29,7 @@ const whatsapp = brand.contact.whatsapp;
     <div class="thanks" role="status">
       <h2 id="enq-h">Thank you</h2>
       <p>Your enquiry about the {car} has been sent.</p>
+      <p><a class="again" href={`${here}?again#enquire`}>Send another message</a></p>
     </div>
   ) : (
     <form method="post" action={`${here}#enquire`} novalidate>
@@ -260,5 +261,8 @@ const whatsapp = brand.contact.whatsapp;
   }
   .thanks p {
     margin: 0;
+  }
+  .again {
+    font-weight: 700;
   }
 </style>

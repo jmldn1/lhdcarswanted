@@ -44,6 +44,18 @@ const sales = brand.contact.phones[0];
     {preloadFonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
     <style is:inline set:html={brandCss()}></style>
     <script is:inline>document.documentElement.classList.add("js");</script>
+    <script is:inline>
+      // After a form is sent, its thank-you shows at ?sent=1 (posting and
+      // then redirecting, so a refresh can't send it twice). Take that off the
+      // address once shown, so a refresh or a shared link gives the page as
+      // normal; ?again ("Send another message") goes too.
+      (() => {
+        const u = new URL(location.href);
+        const had = ["sent", "again"].filter((k) => u.searchParams.has(k));
+        had.forEach((k) => u.searchParams.delete(k));
+        if (had.length) history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+      })();
+    </script>
   </head>
   <body>
     <header class="site-head">
