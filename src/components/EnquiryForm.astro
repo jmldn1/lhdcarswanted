@@ -34,21 +34,23 @@ const whatsapp = brand.contact.whatsapp;
     <form method="post" action={`${here}#enquire`} novalidate>
       <h2 id="enq-h">{heading}</h2>
       {(sales || whatsapp) && (
-        <p class="talk-first">
-          <span class="tf-label">Prefer to talk?</span>
-          {sales && (
-            <a href={`tel:${sales.tel}`}>
-              <svg class="i-tel" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
-              Call {sales.display}
-            </a>
-          )}
-          {whatsapp && (
-            <a class="enq-wa" href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(car)}`} data-car={car} target="_blank" rel="noopener">
-              <svg class="i-wa" viewBox="0 0 16 16" aria-hidden="true"><path d={WHATSAPP_ICON} /></svg>
-              WhatsApp
-            </a>
-          )}
-        </p>
+        <>
+          <div class:list={["quick", { one: !(sales && whatsapp) }]}>
+            {whatsapp && (
+              <a class="enq-wa" href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(car)}`} data-car={car} target="_blank" rel="noopener">
+                <svg class="i-wa" viewBox="0 0 16 16" aria-hidden="true"><path d={WHATSAPP_ICON} /></svg>
+                WhatsApp
+              </a>
+            )}
+            {sales && (
+              <a href={`tel:${sales.tel}`} aria-label={`Call ${sales.display}`}>
+                <svg class="i-tel" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" /></svg>
+                {sales.display}
+              </a>
+            )}
+          </div>
+          <p class="or-line" aria-hidden="true">or send an enquiry</p>
+        </>
       )}
       {failed && <p class="fail" role="alert">Sorry, that didn't send. Please try again, or call us.</p>}
       <div class="field">
@@ -118,36 +120,50 @@ const whatsapp = brand.contact.whatsapp;
     flex-direction: column;
     gap: 16px;
   }
-  /* Call or WhatsApp, quietly, before the form. */
-  .talk-first {
+  /* WhatsApp and Call first, two equal outlined buttons, then "or send an
+     enquiry" between two lines, as in v1's enquiry pop-up. */
+  .quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .quick.one {
+    grid-template-columns: 1fr;
+  }
+  .quick a {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 2px 16px;
-    margin: -4px 0 0;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--color-line);
-    color: var(--color-muted);
-    font-size: 15px;
-  }
-  /* Phones: the question on its own line, Call and WhatsApp side by side. */
-  @media (max-width: 479px) {
-    .tf-label {
-      flex-basis: 100%;
-    }
-  }
-  .talk-first a {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    min-height: 40px;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 10px;
+    border: 1px solid var(--color-line);
     color: var(--color-fg);
     font-weight: 700;
+    font-size: 15px;
     text-decoration: none;
+    white-space: nowrap;
   }
-  .talk-first a:hover {
-    text-decoration: underline;
-    text-underline-offset: 4px;
+  .quick a:hover {
+    border-color: var(--color-muted);
+    background: var(--color-bg);
+  }
+  .or-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 2px 0 0;
+    color: var(--color-muted);
+    font: 600 12px/1 var(--font-body);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .or-line::before,
+  .or-line::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--color-line);
   }
   .i-tel {
     width: 17px;
